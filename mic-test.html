@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Тест микрофона и распознавания речи</title>
+  <style>
+    body { font-family: sans-serif; background: #0a0f1f; color: #fff; text-align: center; padding: 40px; }
+    button { font-size: 1.1rem; padding: 10px 20px; border-radius: 8px; border: none; background: #007aff; color: white; cursor: pointer; }
+    #interim { color: #6ba6ff; font-size: 1.4rem; }
+    #final { color: #fff; font-weight: bold; font-size: 1.6rem; margin-top: 10px; display: block; }
+    .muted { color: #888; font-size: 0.9rem; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>🎙️ Тест микрофона</h1>
+  <p>Нажми кнопку и скажи что-нибудь. Проверим, что работает распознавание речи.</p>
+  <button id="startBtn">🎤 Начать</button>
+  <div id="interim"></div>
+  <div id="final"></div>
+  <div class="muted" id="status"></div>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const interimEl = document.getElementById('interim');
+    const finalEl = document.getElementById('final');
+    const statusEl = document.getElementById('status');
+    let listening = false;
+    let recognition;
+
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      statusEl.textContent = 'Ваш браузер не поддерживает Web Speech API 😞';
+      startBtn.disabled = true;
+    } else {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.lang = 'ru-RU';
+      recognition.interimResults = true;
+      recognition.continuous = true;
+
+      recognition.onstart = () => { statusEl.textContent = '🎧 Слушаю...'; };
+      recognition.onend = () => { statusEl.textContent = '⏹️ Остановлено.'; listening = false; startBtn.textContent = '🎤 Начать'; };
+      recognition.onerror = e => { statusEl.textContent = 'Ошибка: ' + e.error; };
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res.isFinal) final += res[0].transcript + ' ';
+          else interim += res[0].transcript;
+        }
+        interimEl.textContent = interim;
+        finalEl.textContent = final;
+      };
+
+      startBtn.onclick = () => {
+        if (listening) {
+          recognition.stop();
+        } else {
+          recognition.start();
+          startBtn.textContent = '⏹️ Остановить';
+          listening = true;
+        }
+      };
+    }
+  </script>
+</body>
+</html>

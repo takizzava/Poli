@@ -1,0 +1,390 @@
+/* === MIC BUTTON styles (improved) ===========================================
+   - improved: .mic .label positioning and styling
+   - fixed: label visibility and centering
+   - enhanced: animations and transitions
+=========================================================================== */
+
+/* --- базовая раскладка карточки, чтобы кнопка была по центру --- */
+.card.voice-mode { display:flex; flex-direction:column; align-items:center; }
+
+/* === LISTEN BTN (glass + waves) ========================================= */
+
+.listen-btn {
+  /* theme vars */
+  --primary-color: #7aa2ff;
+  --secondary-color: #a57aff;
+  --success-color: #00ff95;
+  --danger-color: #ff6b6b;
+  --text-color: #e9eef8;
+  --bg-dark: rgba(18, 26, 51, 0.9);
+  --border-light: rgba(255, 255, 255, 0.1);
+
+  position: relative;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-light);
+  background: var(--bg-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  isolation: isolate;
+  margin: 0 auto;        /* центрирование */
+  padding: 0;
+
+  /* glass morphism */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+
+  animation: button-appear 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* внутренний градиент */
+.listen-btn::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(122,162,255,.15) 0%, rgba(165,122,255,.1) 25%, transparent 60%),
+    radial-gradient(circle at 70% 70%, rgba(255,255,255,.08) 0%, transparent 50%);
+  z-index: -1;
+  opacity: .8;
+  transition: opacity .3s ease;
+}
+
+/* hover */
+.listen-btn:hover:not(.disabled) {
+  transform: scale(1.05);
+  border-color: rgba(122, 162, 255, 0.3);
+  box-shadow:
+    0 25px 50px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(122, 162, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+.listen-btn:hover:not(.disabled)::before { opacity: 1; }
+
+/* активна */
+.listen-btn.active {
+  border-color: rgba(0, 255, 149, 0.4);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(0,255,149,.1) 0%, rgba(18,26,51,.9) 60%);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%,100% {
+    box-shadow:
+      0 20px 40px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(0,255,149,.2),
+      inset 0 1px 0 rgba(255,255,255,.1);
+  }
+  50% {
+    box-shadow:
+      0 25px 50px rgba(0,0,0,.4),
+      0 0 0 2px rgba(0,255,149,.3),
+      inset 0 1px 0 rgba(255,255,255,.15);
+  }
+}
+
+/* вспышка при пробуждении */
+.listen-btn.wake-ping::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,255,200,.8);
+  filter: drop-shadow(0 0 12px rgba(0,255,200,.5));
+  animation: wakeFlash .65s ease-out;
+  pointer-events: none;
+}
+@keyframes wakeFlash {
+  0% { opacity: 1; transform: scale(.9); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+
+/* disabled */
+.listen-btn.disabled {
+  opacity: .6; cursor: not-allowed; filter: grayscale(.5);
+}
+.listen-btn.disabled:hover {
+  transform: none; border-color: var(--border-light);
+}
+
+/* waves */
+.voice-waves {
+  position: absolute; inset: 0; border-radius: 50%;
+  pointer-events: none; z-index: 1;
+}
+.wave {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  border: 2px solid var(--primary-color);
+  border-radius: 50%; opacity: 0;
+  animation-timing-function: cubic-bezier(0.4,0,0.2,1);
+}
+.wave-1 { animation-delay: 0s; }
+.wave-2 { animation-delay: .8s; }
+.wave-3 { animation-delay: 1.6s; }
+.listen-btn.active .wave { animation: wave-expand 2.4s cubic-bezier(0.4,0,0.2,1) infinite; }
+@keyframes wave-expand {
+  0%   { width:0; height:0; opacity:.8; border-width:3px; }
+  50%  { opacity:.4; }
+  100% { width:280px; height:280px; opacity:0; border-width:1px; }
+}
+.listen-btn.active .wave { border-color: var(--success-color); }
+
+/* icon */
+.voice-icon {
+  position: relative; width: 80px; height: 80px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,.3) 0%, transparent 50%),
+    linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:
+    0 8px 32px rgba(122,162,255,.4),
+    inset 0 1px 0 rgba(255,255,255,.2),
+    inset 0 -1px 0 rgba(0,0,0,.2);
+  transition: all .4s cubic-bezier(0.4,0,0.2,1);
+  z-index:2;
+}
+.voice-icon-inner {
+  width: 24px; height: 24px; border-radius: 50%;
+  background:#fff;
+  box-shadow: 0 0 20px #fff, 0 0 40px rgba(122,162,255,.6);
+  transition: all .3s ease;
+}
+.listen-btn:hover:not(.disabled) .voice-icon { transform: scale(1.1);
+  box-shadow: 0 12px 40px rgba(122,162,255,.6),
+              inset 0 1px 0 rgba(255,255,255,.3),
+              inset 0 -1px 0 rgba(0,0,0,.3);
+}
+.listen-btn:hover:not(.disabled) .voice-icon-inner {
+  transform: scale(1.15);
+  box-shadow: 0 0 25px #fff, 0 0 50px rgba(122,162,255,.8);
+}
+.listen-btn.active .voice-icon {
+  background: linear-gradient(135deg, var(--success-color), #00ccff);
+  box-shadow: 0 8px 32px rgba(0,255,149,.5),
+              inset 0 1px 0 rgba(255,255,255,.3),
+              inset 0 -1px 0 rgba(0,0,0,.3);
+  animation: icon-pulse 1.5s ease-in-out infinite;
+}
+.listen-btn.active .voice-icon-inner {
+  background:#fff; box-shadow: 0 0 25px #fff, 0 0 50px rgba(0,255,149,.8);
+}
+@keyframes icon-pulse { 0%,100%{ transform: scale(1) } 50%{ transform: scale(1.05) } }
+
+/* текст */
+.mic-label {
+  font-size: 16px; font-weight: 600; color: var(--text-color);
+  text-align: center; z-index: 2; transition: all .3s ease;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5); letter-spacing: .3px;
+}
+.listen-btn:hover:not(.disabled) .mic-label { color: var(--primary-color); transform: translateY(-1px); }
+.listen-btn.active .mic-label {
+  color: var(--success-color); font-weight:700; animation: text-glow 2s ease-in-out infinite;
+}
+@keyframes text-glow {
+  0%,100% { text-shadow: 0 0 10px rgba(0,255,149,.5), 0 1px 2px rgba(0,0,0,.5); }
+  50%     { text-shadow: 0 0 15px rgba(0,255,149,.8), 0 1px 2px rgba(0,0,0,.5); }
+}
+
+/* индикатор активности */
+.voice-activity {
+  position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+  width:60px; height:4px; background:rgba(255,255,255,.1);
+  border-radius:2px; overflow:hidden; z-index:2;
+}
+.activity-bar {
+  width:100%; height:100%;
+  background:linear-gradient(90deg, var(--success-color), #00ccff);
+  border-radius:2px; animation: activity-pulse 1.5s ease-in-out infinite;
+  transform-origin:left;
+}
+@keyframes activity-pulse { 0%,100%{ transform:scaleX(.3); opacity:.7 } 50%{ transform:scaleX(1); opacity:1 } }
+
+/* === MIC (rings variant) - IMPROVED ===================================== */
+
+.mic{
+  --core:#10e7ff; --ring:#0ea5ff; --glow:#8b5cf6; --label:#8bd8ff;
+
+  position: relative;
+  display: block;
+  margin: 12px auto 28px;     /* центрирование */
+  width: 180px;
+  height: 180px;
+  border: none;
+  border-radius: 50%;
+  background: radial-gradient(120px 120px at 50% 45%, var(--core), transparent 70%);
+  filter: drop-shadow(0 12px 30px rgba(0,0,0,.45));
+  cursor: pointer;
+  transition: transform .15s ease;
+}
+.mic:is(:hover,:focus-visible){ transform: translateY(-2px) }
+.mic .core{
+  position:absolute; 
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width:76px; height:76px; border-radius:50%;
+  background: radial-gradient(30px 30px at 50% 40%, #fff, var(--core));
+  box-shadow: 0 0 40px 6px var(--core);
+  z-index: 3;
+}
+.mic .ring{ 
+  position:absolute; 
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius:50%; 
+  pointer-events:none; 
+}
+.mic .ring-1{
+  width: 220px; height: 220px;
+  background: radial-gradient(120px 120px at 50% 50%, transparent 40%, color-mix(in oklab, var(--glow), transparent 60%));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ring), transparent 35%);
+  z-index: 1;
+}
+.mic .ring-2{
+  width: 260px; height: 260px;
+  background: radial-gradient(140px 140px at 50% 50%, transparent 50%, color-mix(in oklab, var(--glow), transparent 75%));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ring), transparent 50%);
+  filter: blur(.4px);
+  z-index: 1;
+}
+
+/* УЛУЧШЕННАЯ подпись */
+.mic .label{
+  position: absolute; 
+  bottom: -52px; 
+  left: 50%; 
+  transform: translateX(-50%);
+  padding: 10px 20px; 
+  border-radius: 16px;
+  font: 600 16px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--label);
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 
+    0 8px 32px rgba(0,0,0,.4),
+    0 2px 8px rgba(0,0,0,.2),
+    inset 0 1px 0 rgba(255,255,255,.1);
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 140px;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+/* состояния label */
+.mic:hover .label {
+  transform: translateX(-50%) translateY(-2px);
+  background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.08));
+  box-shadow: 
+    0 12px 40px rgba(0,0,0,.5),
+    0 4px 12px rgba(0,0,0,.3),
+    inset 0 1px 0 rgba(255,255,255,.15);
+}
+
+.mic.is-on .label {
+  color: #00ffaa;
+  background: linear-gradient(180deg, rgba(0,255,170,.15), rgba(0,255,170,.08));
+  border: 1px solid rgba(0,255,170,.25);
+  animation: label-pulse 2s ease-in-out infinite;
+}
+
+@keyframes label-pulse {
+  0%, 100% { 
+    box-shadow: 
+      0 8px 32px rgba(0,255,170,.3),
+      0 2px 8px rgba(0,0,0,.2),
+      inset 0 1px 0 rgba(255,255,255,.1);
+  }
+  50% { 
+    box-shadow: 
+      0 12px 40px rgba(0,255,170,.5),
+      0 4px 12px rgba(0,0,0,.3),
+      inset 0 1px 0 rgba(255,255,255,.15);
+  }
+}
+
+/* состояния */
+.mic.is-on .ring-1{ animation: breathe 2.6s ease-in-out infinite }
+.mic.is-on .ring-2{ animation: breathe 3s ease-in-out infinite }
+.mic.wake .ring-1, .mic.wake .ring-2{ animation: wake .65s ease-out 1 }
+@keyframes breathe{ 0%,100%{ transform:translate(-50%, -50%) scale(1); opacity:.85 } 50%{ transform:translate(-50%, -50%) scale(1.03); opacity:1 } }
+@keyframes wake{ 0%{ transform:translate(-50%, -50%) scale(.96); filter:brightness(1.1) } 75%{ transform:translate(-50%, -50%) scale(1.06); filter:brightness(1.35) } 100%{ transform:translate(-50%, -50%) scale(1); filter:brightness(1) } }
+
+/* адаптив */
+@media (max-width: 768px){
+  .listen-btn{ width:200px; height:200px }
+  .voice-icon{ width:65px; height:65px }
+  .voice-icon-inner{ width:20px; height:20px }
+  .mic-label{ font-size:14px }
+  @keyframes wave-expand { 100%{ width:240px; height:240px } }
+  
+  .mic { width: 160px; height: 160px; }
+  .mic .core { width: 68px; height: 68px; }
+  .mic .ring-1 { width: 200px; height: 200px; }
+  .mic .ring-2 { width: 240px; height: 240px; }
+  .mic .label { 
+    font-size: 14px; 
+    padding: 8px 16px;
+    bottom: -46px;
+    min-width: 120px;
+  }
+}
+@media (max-width: 480px){
+  .listen-btn{ width:180px; height:180px }
+  .voice-icon{ width:55px; height:55px }
+  .voice-icon-inner{ width:18px; height:18px }
+  .mic-label{ font-size:13px }
+  
+  .mic { width: 140px; height: 140px; }
+  .mic .core { width: 60px; height: 60px; }
+  .mic .ring-1 { width: 180px; height: 180px; }
+  .mic .ring-2 { width: 220px; height: 220px; }
+  .mic .label { 
+    font-size: 13px; 
+    padding: 6px 14px;
+    bottom: -42px;
+    min-width: 110px;
+  }
+}
+
+/* темы */
+@media (prefers-color-scheme: light){
+  .listen-btn{
+    --text-color:#1e293b; --bg-dark: rgba(255,255,255,.95); --border-light: rgba(0,0,0,.1);
+  }
+  .listen-btn::before{
+    background:
+      radial-gradient(circle at 30% 30%, rgba(59,130,246,.1) 0%, rgba(139,92,246,.08) 25%, transparent 60%),
+      radial-gradient(circle at 70% 70%, rgba(0,0,0,.05) 0%, transparent 50%);
+  }
+}
+
+/* доступность */
+@media (prefers-reduced-motion: reduce){
+  .listen-btn, .voice-icon, .mic-label { transition: opacity .3s ease }
+  .listen-btn.active { animation: none }
+  .wave, .activity-bar { animation: none; opacity: 0 }
+  .mic.is-on .ring-1,
+  .mic.is-on .ring-2,
+  .mic.is-on .label { animation: none; }
+}
+
+/* фокус */
+.listen-btn:focus-visible { outline:2px solid var(--primary-color); outline-offset:4px }
+.mic:focus-visible { outline: 2px solid var(--core); outline-offset: 4px; }

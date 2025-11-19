@@ -1,0 +1,14 @@
+.skin-switcher{
+  display:flex; gap:10px; align-items:center;
+  margin:10px 0 0 0;
+}
+.skin-switcher > button{
+  width:28px; height:28px; border-radius:50%; border:none; cursor:pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  outline-offset: 3px;
+}
+.skin-switcher > button.active{ outline:2px solid #fff8; }
+.skin-switcher > button[data-skin="aqua"]  { background: radial-gradient(circle at 40% 35%, #10e7ff, #0ea5ff 60%, #8b5cf6); }
+.skin-switcher > button[data-skin="coral"] { background: radial-gradient(circle at 40% 35%, #ff7a6e, #ff3d71 60%, #ff9bd0); }
+.skin-switcher > button[data-skin="violet"]{ background: radial-gradient(circle at 40% 35%, #b084ff, #8b5cf6 60%, #c084fc); }
+.skin-switcher > button[data-skin="lime"]  { background: radial-gradient(circle at 40% 35%, #5bff9a, #22c55e 60%, #a7f3d0); }

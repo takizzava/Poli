@@ -1,0 +1,99 @@
+/* Theme Toggle Styles */
+.theme-toggle {
+  background: var(--gradient-glass);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  font-size: 0.875rem;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Dark theme styles */
+.theme-toggle.dark {
+  background: rgba(12, 18, 38, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e9eef8;
+}
+
+.theme-toggle.dark:hover {
+  background: rgba(12, 18, 38, 0.9);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+/* Light theme styles */
+.theme-toggle.light {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #111827;
+}
+
+.theme-toggle.light:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  transform: translateY(-1px);
+}
+
+.theme-toggle:active {
+  transform: translateY(0);
+}
+
+.theme-toggle-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover .theme-toggle-inner {
+  transform: scale(1.05);
+}
+
+.theme-icon {
+  font-size: 1.1rem;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-toggle:hover .theme-icon {
+  transform: rotate(15deg);
+}
+
+.theme-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .theme-toggle {
+    padding: var(--space-xs) var(--space-sm);
+  }
+  
+  .theme-label {
+    display: none;
+  }
+  
+  .theme-toggle-inner {
+    gap: 0;
+  }
+}
+
+/* Animation for theme switch */
+@keyframes themeSwitch {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.theme-toggle:active .theme-icon {
+  animation: themeSwitch 0.3s ease;
+}
