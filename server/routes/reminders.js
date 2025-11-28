@@ -64,4 +64,26 @@ r.delete('/reminders/:id', async (req, res) => {
   }
 })
 
+// PUT /api/reminders/:id
+r.put('/reminders/:id', async (req, res) => {
+  try {
+    const id = String(req.params.id || '')
+    const { text, due } = req.body || {}
+    const dueMs = Number(due)
+    const clean = String(text || '').trim()
+    if (!clean || !Number.isFinite(dueMs)) return res.status(400).json({ error: 'text and due(ms) required' })
+
+    const rows = await query(
+      `update reminders set text=$1, due=to_timestamp($2/1000.0) where id=$3 and user_id=$4 returning id, user_id, text, extract(epoch from due)*1000 as due`,
+      [clean, dueMs, id, req.user.id]
+    )
+    const row = rows && rows[0]
+    if (!row) return res.status(404).json({ error: 'not found' })
+    res.json(row)
+  } catch (e) {
+    console.error('[reminders:update]', e?.message || e)
+    res.status(500).json({ error: 'update failed' })
+  }
+})
+
 export default r

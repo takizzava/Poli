@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Поли — расширение",
+  "version": "0.1.0",
+  "description": "Минимальное расширение для доступа к API Поли (логин, напоминания) из панели браузера.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://localhost:8080/*"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

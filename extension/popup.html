@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Поли — расширение</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <h2>Поли</h2>
+
+    <div id="server-row">
+      <label>API URL</label>
+      <input id="serverUrl" placeholder="http://localhost:8080" />
+      <button id="saveServer">Сохранить</button>
+    </div>
+
+    <div id="auth">
+      <h3>Авторизация</h3>
+      <div id="userBox" class="hidden">
+        <div id="userInfo"></div>
+        <button id="btnLogout">Выйти</button>
+      </div>
+      <form id="loginForm">
+        <input id="email" type="email" placeholder="email" required />
+        <input id="password" type="password" placeholder="password" required />
+        <button id="btnLogin">Войти</button>
+      </form>
+    </div>
+
+    <div id="reminders">
+      <h3>Напоминания</h3>
+
+      <form id="remForm">
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="remText" placeholder="Текст напоминания" required />
+          <button id="btnMic" type="button" title="Голосовой ввод">🎤</button>
+        </div>
+        <input id="remDue" type="datetime-local" />
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button id="btnSaveRem" type="submit">Добавить</button>
+          <button id="btnCancelEdit" type="button" class="hidden">Отменить</button>
+          <button id="btnFetch" type="button">Обновить</button>
+          <button id="btnAddSample" type="button">Добавить тестовое</button>
+        </div>
+      </form>
+
+      <ul id="remList"></ul>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
