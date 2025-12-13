@@ -178,11 +178,11 @@ export default function AuthPanel({ onAuthed }){
           <div className="user-profile">
             <div className="profile-info">
               <div className="profile-avatar">
-                {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                {user.email?.[0]?.toUpperCase() || 'U'}
               </div>
               <div className="profile-details">
                 <h3 className="profile-name">
-                  {user.name || 'Пользователь'}
+                  {user.email ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1) : 'Пользователь'}
                 </h3>
                 <p className="profile-email">{user.email}</p>
               </div>

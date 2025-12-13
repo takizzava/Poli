@@ -1,0 +1,89 @@
+/* User Badge Styles */
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.5rem);
+  padding: var(--space-sm, 0.5rem) var(--space-md, 1rem);
+  background: var(--gradient-glass, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 0.5rem);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.user-badge:hover {
+  background: var(--gradient-glass-hover, rgba(255, 255, 255, 0.08));
+  border-color: var(--line-hover, rgba(255, 255, 255, 0.15));
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: var(--gradient-primary, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.user-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+/* Loading states */
+.user-badge--loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.user-avatar--skeleton,
+.user-name--skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background: var(--skeleton-bg, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.user-avatar--skeleton {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.user-name--skeleton {
+  height: 14px;
+  width: 80px;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .user-name {
+    display: none;
+  }
+  
+  .user-badge {
+    padding: var(--space-sm, 0.5rem);
+  }
+}
+

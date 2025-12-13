@@ -5,6 +5,7 @@ import TasksPanel from './panels/TasksPanel.jsx'
 import SettingsPanel from './panels/SettingsPanel.jsx'
 import AuthPanel from './panels/AuthPanel.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
+import UserBadge from './components/UserBadge.jsx'
 import { listReminders, createReminder, deleteReminder } from './api/reminders.js'
 import { me } from './api/auth.js'
 
@@ -106,14 +107,7 @@ export default function App(){
 
           <div className="header-controls">
             <ThemeToggle />
-            {user && (
-              <div className="user-badge">
-                <div className="user-avatar">
-                  {user.name?.[0]?.toUpperCase() || 'U'}
-                </div>
-                <span className="user-name">{user.name || 'Пользователь'}</span>
-              </div>
-            )}
+            <UserBadge user={user} isLoading={isLoading} />
           </div>
         </div>
       </header>

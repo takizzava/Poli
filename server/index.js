@@ -12,6 +12,7 @@ import remindersRouter from './routes/reminders.js'
 import pushRouter from './routes/push.js'
 import aiRouter from './routes/ai.js'
 import ttsRouter from './routes/tts.js'
+import notificationSettingsRouter from './routes/notification-settings.js'
 import { bootSchedule } from './scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -40,6 +41,7 @@ app.use('/api', remindersRouter)
 app.use('/api', pushRouter)
 app.use('/api', aiRouter)
 app.use('/api', ttsRouter)
+app.use('/api', notificationSettingsRouter)
 
 // Static build (if you run npm run build)
 const pub = path.join(__dirname, 'public')
