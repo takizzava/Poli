@@ -1,44 +1,49 @@
 import { useEffect, useState } from 'react'
-import { login, signup, logout, me } from '../api/auth.js'
-import '../styles/auth-panel.css' //
+import { login, logout, me, signup } from '../api/auth.js'
 
-export default function AuthPanel({ onAuthed }){
+export default function AuthPanel({ onAuthed, onLoggedOut }) {
   const [email, setEmail] = useState('')
-  const [pass, setPass] = useState('')
-  const [status, setStatus] = useState('Проверка…')
+  const [password, setPassword] = useState('')
+  const [status, setStatus] = useState('Проверяем состояние сессии...')
   const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('login') // 'login' или 'signup'
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('login')
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkSession = async () => {
       try {
-        const u = await me()
-        setUser(u)
-        setStatus(`Вошли как ${u.email}`)
+        const currentUser = await me()
+        setUser(currentUser)
+        setStatus(`Сессия активна: ${currentUser.email}`)
       } catch {
-        setStatus('Не вошли')
+        setStatus('Вход не выполнен.')
+      } finally {
+        setIsLoading(false)
       }
     }
-    checkAuth()
+
+    checkSession()
   }, [])
 
-  const handleAuth = async (authFn, action) => {
-    if (!email || !pass) {
-      setStatus('Заполните все поля')
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) {
+      setStatus('Заполните email и пароль.')
       return
     }
 
     setIsLoading(true)
-    setStatus(`${action}...`)
-    
+    setStatus(activeTab === 'login' ? 'Выполняем вход...' : 'Создаем аккаунт...')
+
     try {
-      const u = await authFn(email, pass)
-      setUser(u)
-      setStatus(`Успешный вход как ${u.email}`)
-      onAuthed?.(u)
-    } catch (e) {
-      setStatus(`Ошибка ${action.toLowerCase()}: ${e.message || 'Неизвестная ошибка'}`)
+      const currentUser =
+        activeTab === 'login'
+          ? await login(email.trim(), password)
+          : await signup(email.trim(), password)
+      setUser(currentUser)
+      setStatus(`Готово: ${currentUser.email}`)
+      onAuthed?.(currentUser)
+    } catch (error) {
+      setStatus(`Ошибка: ${error.message || 'операция не выполнена'}`)
     } finally {
       setIsLoading(false)
     }
@@ -46,12 +51,15 @@ export default function AuthPanel({ onAuthed }){
 
   const handleLogout = async () => {
     setIsLoading(true)
+    setStatus('Завершаем сессию...')
+
     try {
       await logout()
       setUser(null)
-      setStatus('Вы вышли из системы')
-    } catch (e) {
-      setStatus('Ошибка выхода')
+      setStatus('Вы вышли из аккаунта.')
+      onLoggedOut?.()
+    } catch {
+      setStatus('Не удалось выйти из аккаунта.')
     } finally {
       setIsLoading(false)
     }
@@ -59,157 +67,69 @@ export default function AuthPanel({ onAuthed }){
 
   return (
     <div className="auth-panel">
-      <div className="auth-card">
-        {/* Header */}
-        <div className="auth-header">
-          <div className="auth-avatar">
-            {user ? '👤' : '🔐'}
+      <div className="auth-status">{status}</div>
+
+      {!user ? (
+        <div className="auth-box">
+          <div className="auth-tabs">
+            <button
+              type="button"
+              className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
+              onClick={() => setActiveTab('login')}
+              disabled={isLoading}
+            >
+              Вход
+            </button>
+            <button
+              type="button"
+              className={`auth-tab ${activeTab === 'signup' ? 'active' : ''}`}
+              onClick={() => setActiveTab('signup')}
+              disabled={isLoading}
+            >
+              Регистрация
+            </button>
           </div>
-          <div className="auth-info">
-            <h2 className="auth-title">Аккаунт</h2>
-            <div className={`auth-status ${status.includes('Ошибка') ? 'error' : ''} ${status.includes('Успешный') ? 'success' : ''}`}>
-              {status}
-            </div>
+
+          <div className="auth-form">
+            <label className="auth-field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={isLoading}
+              />
+            </label>
+
+            <label className="auth-field">
+              <span>Пароль</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                disabled={isLoading}
+              />
+            </label>
+
+            <button type="button" className="auth-action" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? 'Обрабатываем...' : activeTab === 'login' ? 'Войти' : 'Создать аккаунт'}
+            </button>
           </div>
         </div>
-
-        {!user ? (
-          <div className="auth-content">
-            {/* Tab Navigation */}
-            <div className="auth-tabs">
-              <button 
-                className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
-                onClick={() => setActiveTab('login')}
-              >
-                <span className="auth-tab-icon">↳</span>
-                Вход
-              </button>
-              <button 
-                className={`auth-tab ${activeTab === 'signup' ? 'active' : ''}`}
-                onClick={() => setActiveTab('signup')}
-              >
-                <span className="auth-tab-icon">+</span>
-                Регистрация
-              </button>
-            </div>
-
-            {/* Auth Form */}
-            <div className="auth-form">
-              <div className="input-group">
-                <label className="input-label">Email</label>
-                <input 
-                  className="input-field"
-                  type="email" 
-                  placeholder="your@email.com"
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="input-group">
-                <label className="input-label">Пароль</label>
-                <input 
-                  className="input-field"
-                  type="password" 
-                  placeholder="Введите пароль"
-                  value={pass} 
-                  onChange={e => setPass(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-
-              <button 
-                className={`auth-btn ${isLoading ? 'loading' : ''}`}
-                onClick={() => handleAuth(
-                  activeTab === 'login' ? login : signup,
-                  activeTab === 'login' ? 'Вход' : 'Регистрация'
-                )}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <div className="spinner"></div>
-                    {activeTab === 'login' ? 'Вход...' : 'Регистрация...'}
-                  </>
-                ) : (
-                  <>
-                    <span className="btn-icon">
-                      {activeTab === 'login' ? '↳' : '+'}
-                    </span>
-                    {activeTab === 'login' ? 'Войти в аккаунт' : 'Создать аккаунт'}
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="auth-divider">
-              <span>или</span>
-            </div>
-
-            {/* Quick Switch */}
-            <div className="auth-switch">
-              {activeTab === 'login' ? (
-                <p>
-                  Нет аккаунта?{' '}
-                  <button 
-                    className="link-btn"
-                    onClick={() => setActiveTab('signup')}
-                  >
-                    Зарегистрироваться
-                  </button>
-                </p>
-              ) : (
-                <p>
-                  Уже есть аккаунт?{' '}
-                  <button 
-                    className="link-btn"
-                    onClick={() => setActiveTab('login')}
-                  >
-                    Войти
-                  </button>
-                </p>
-              )}
+      ) : (
+        <div className="auth-box user">
+          <div className="user-line">
+            <div className="user-avatar">{user.email?.[0]?.toUpperCase() || 'U'}</div>
+            <div>
+              <div className="user-name">{user.email}</div>
+              <div className="muted">Активная серверная сессия</div>
             </div>
           </div>
-        ) : (
-          /* User Profile */
-          <div className="user-profile">
-            <div className="profile-info">
-              <div className="profile-avatar">
-                {user.email?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <div className="profile-details">
-                <h3 className="profile-name">
-                  {user.email ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1) : 'Пользователь'}
-                </h3>
-                <p className="profile-email">{user.email}</p>
-              </div>
-            </div>
-
-            <div className="profile-actions">
-              <button 
-                className="logout-btn"
-                onClick={handleLogout}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <div className="spinner small"></div>
-                    Выход...
-                  </>
-                ) : (
-                  <>
-                    <span className="btn-icon">🚪</span>
-                    Выйти
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+          <button type="button" className="auth-action ghost" onClick={handleLogout} disabled={isLoading}>
+            {isLoading ? '...' : 'Выйти'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

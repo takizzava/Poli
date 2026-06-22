@@ -1,0 +1,116 @@
+.profile-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.profile-panel .panel-header h2 {
+  margin: 0;
+}
+
+.profile-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-grid .card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+  padding: 12px;
+}
+
+.card-title {
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.profile-form {
+  display: grid;
+  gap: 8px;
+}
+
+.form-label,
+.muted {
+  color: var(--muted);
+}
+
+.input {
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+.avatar-block {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.avatar-preview {
+  width: 82px;
+  height: 82px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  color: var(--muted);
+}
+
+.alert {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+}
+
+.alert.success {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.alert.danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+}

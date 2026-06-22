@@ -1,48 +1,65 @@
-// src/speech/useSpeech.js
-// ====== Голос: FSM IDLE → ARMED (ждём «Поли») → CAPTURE ======
+﻿// src/speech/useSpeech.js
+export const SPEECH_STATE = { IDLE: 'idle', ARMED: 'armed', CAPTURE: 'capture' }
 
-const STATE = { IDLE: 'idle', ARMED: 'armed', CAPTURE: 'capture' }
-
-// кириллица: границы слова через «не-буква/цифра/_»
-const HOTWORD_RE = new RegExp(
-  '(^|[^\\p{L}\\p{N}_])' +
-    '(п\\s*о\\s*л\\s*и|полли|поля|поль|поле)' +
-    '(?=$|[^\\p{L}\\p{N}_])',
-  'iu'
-)
-function hasHotword(t) { return HOTWORD_RE.test(t) }
-function stripHotword(t) { return t.replace(HOTWORD_RE, (_m, left) => (left || ' ')).trim() }
-
-// маркеры досрочного завершения
 const END_RE = /(создай|добавь|сохрани)(\s+(задач[ауе]|напоминан(?:ие|ье|ия)?))?$|всё$|готово$|конец$/i
 
-// тайминги
 const SILENCE_AFTER_FINAL_MS = 1600
 const MAX_CAPTURE_MS = 15000
 const RESTART_COOLDOWN_MS = 600
 
-// --- settings persisted ---
 function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} }
-function load(k, d){ try{ const v = localStorage.getItem(k); return v==null? d : JSON.parse(v) }catch{ return d } }
-function loadNum(k,d){ const n=load(k,d); return Number.isFinite(+n)? +n : d }
-function loadBool(k,d){ const v=load(k,d); return typeof v==='boolean'? v : d }
+function load(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v) }catch{ return d } }
+function loadNum(k,d){ const n = load(k,d); return Number.isFinite(+n) ? +n : d }
+function loadBool(k,d){ const v = load(k,d); return typeof v === 'boolean' ? v : d }
 
-let WAKE_ON  = loadBool('wakeEnable', true)
-let WINDOW_MS= loadNum('wakeWindow', 6000)
+let WAKE_ON = loadBool('wakeEnable', true)
+let WINDOW_MS = loadNum('wakeWindow', 6000)
+let WAKE_WORDS = load('wakeWords', ['поли'])
+if (!Array.isArray(WAKE_WORDS) || !WAKE_WORDS.length) WAKE_WORDS = ['поли']
 
-// --- globals for SR ---
 let SRCls, recognition
 let srStarting=false, srRunning=false, wantRunning=false, aborting=false
 let lastRestart=0
-let state = STATE.ARMED
+let state = SPEECH_STATE.ARMED
+let MANUAL_CAPTURE = false
 
 let audioCtx = (typeof window !== 'undefined' && window.__poliAudioCtx) || null
-
-// буферы распознавания
 const capture = { buf:'', interim:'', timer:null, startedAt:0 }
-let lastFinalText = '' // анти-дубли
+let lastFinalText = ''
 
-// ===== helpers =====
+function escapeRegex(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+function normalizeWord(s){ return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ') }
+
+export function compileWakeRegex(words){
+  const prepared = (Array.isArray(words) ? words : ['поли'])
+    .map(normalizeWord)
+    .filter(Boolean)
+    .map((w) => escapeRegex(w).replace(/\s+/g, '\\s*'))
+  const source = prepared.length ? prepared.join('|') : 'п\\s*о\\s*л\\s*и'
+  return new RegExp(`(^|[^\\p{L}\\p{N}_])(${source})(?=$|[^\\p{L}\\p{N}_])`, 'iu')
+}
+
+let HOTWORD_RE = compileWakeRegex(WAKE_WORDS)
+export function hasHotword(t, re = HOTWORD_RE) { return re.test(t) }
+export function stripHotword(t, re = HOTWORD_RE) { return t.replace(re, (_m, left) => (left || ' ')).trim() }
+export function normalizeTranscript(text = '') {
+  return String(text)
+    .replace(/\s+/g, ' ')
+    .replace(/[.,!?…]+$/u, '')
+    .trim()
+}
+
+export function finalizeCapturedText(buffer = '', interim = '') {
+  const text = normalizeTranscript(`${buffer} ${interim}`)
+  if (!text) return ''
+  return normalizeTranscript(text.replace(END_RE, '').trim() || text)
+}
+
+function setState(nextState, meta = {}) {
+  state = nextState
+  onStateChangeCb?.(nextState, meta)
+}
+
 function beep(){
   try{
     if (!audioCtx || audioCtx.state !== 'running') return
@@ -80,30 +97,20 @@ function setup(){
   r.onstart = () => { srRunning = true; srStarting = false; aborting = false }
   r.onend = () => {
     srRunning = false; srStarting = false
-    // если зовём stop() вручную — не перезапускаем
     if (aborting || !wantRunning) return
     const now = Date.now()
     if (now - lastRestart < RESTART_COOLDOWN_MS) return
     lastRestart = now
     try { srStarting = true; r.start() } catch {}
   }
-  r.onerror = (e) => {
-    // игнорим "aborted/no-speech"; на прочих даём шанс onend перезапустить, если нужно
-    if (e?.error && e.error !== 'aborted' && e.error !== 'no-speech') {
-      // можно логировать при желании
-    }
-  }
+  r.onerror = () => {}
   r.onresult = (ev) => {
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
       const res = ev.results[i]
       const text = (res[0]?.transcript || '').trim()
       if (!text) continue
-
-      if (res.isFinal) {
-        handleFinal(text)
-      } else {
-        handleInterim(text)
-      }
+      if (res.isFinal) handleFinal(text)
+      else handleInterim(text)
     }
   }
   return true
@@ -126,24 +133,24 @@ function extendSilenceTimer(){
 }
 
 function finalize(){
-  if (state !== STATE.CAPTURE) return
-  state = STATE.ARMED
+  if (state !== SPEECH_STATE.CAPTURE) return
   clearTimeout(capture.timer)
-  const text = (capture.buf + ' ' + capture.interim).replace(/\s+/g,' ').trim()
-  capture.buf=''; capture.interim=''
+  const text = finalizeCapturedText(capture.buf, capture.interim)
+  capture.buf=''; capture.interim=''; capture.startedAt = 0
   lastFinalText = ''
   onInterimCb?.('')
+  onLevelCb?.(0)
+  setState(MANUAL_CAPTURE ? SPEECH_STATE.CAPTURE : SPEECH_STATE.ARMED, { reason: 'finalize' })
   if (!text) return
-  const out = (text.replace(END_RE,'').trim() || text)
-  onResultCb?.(out)
+  onResultCb?.(text)
 }
 
-// ===== FSM handlers =====
 function wakeFrom(textAfter=''){
-  if (state === STATE.CAPTURE) return
+  if (state === SPEECH_STATE.CAPTURE) return
   try{ beep() }catch{}
   onWakeCb?.()
-  state = STATE.CAPTURE
+  MANUAL_CAPTURE = false
+  setState(SPEECH_STATE.CAPTURE, { reason: 'wake' })
   capture.buf = textAfter ? textAfter : ''
   capture.interim = ''
   capture.startedAt = Date.now()
@@ -153,9 +160,11 @@ function wakeFrom(textAfter=''){
 }
 
 function handleInterim(raw){
-  let text = raw.replace(/\s+/g,' ').trim()
+  let text = normalizeTranscript(raw)
+  const lvl = Math.min(1, Math.max(0, text.length / 24))
+  onLevelCb?.(lvl)
 
-  if (state === STATE.ARMED){
+  if (state === SPEECH_STATE.ARMED){
     if (WAKE_ON){
       if (hasHotword(text)){
         const rest = stripHotword(text)
@@ -166,32 +175,28 @@ function handleInterim(raw){
         }
       }
       return
-    } else {
-      // прямой режим — отображаем промежуточный текст
-      onInterimCb?.(text)
-      return
     }
+    onInterimCb?.(text)
+    return
   }
 
-  if (state === STATE.CAPTURE){
+  if (state === SPEECH_STATE.CAPTURE){
+    if (!capture.startedAt) capture.startedAt = Date.now()
     if (hasHotword(text)) text = stripHotword(text)
     capture.interim = text
     onInterimCb?.((capture.buf + ' ' + capture.interim).trim())
     if (END_RE.test(text)){ finalize(); return }
     extendSilenceTimer()
-    return
   }
 }
 
 function handleFinal(raw){
-  let text = raw.replace(/\s+/g,' ').trim()
+  let text = normalizeTranscript(raw)
   if (!text) return
-
-  // анти-дубли финалов (некоторые движки присылают повтор)
-  if (text && text === lastFinalText) return
+  if (text === lastFinalText) return
   lastFinalText = text
 
-  if (state === STATE.ARMED){
+  if (state === SPEECH_STATE.ARMED){
     if (WAKE_ON && hasHotword(text)){
       const rest = stripHotword(text)
       wakeFrom(rest)
@@ -205,7 +210,7 @@ function handleFinal(raw){
     return
   }
 
-  if (state === STATE.CAPTURE){
+  if (state === SPEECH_STATE.CAPTURE){
     if (hasHotword(text)) text = stripHotword(text)
     if (text){
       capture.buf = (capture.buf + ' ' + text).trim()
@@ -214,51 +219,75 @@ function handleFinal(raw){
     }
     if (END_RE.test(text)){ finalize(); return }
     extendSilenceTimer()
-    return
   }
 }
 
-// ===== public API =====
-let onResultCb=null, onInterimCb=null, onWakeCb=null
+let onResultCb=null, onInterimCb=null, onWakeCb=null, onLevelCb=null, onStateChangeCb=null
 
-export function useSpeech({ onResult, onFinal, onInterim, onStart, onStop, onWake } = {}){
-  // совместимость: если передали onFinal — используем его как onResult
+if (typeof window !== 'undefined' && !window.__poliWakeWordsBind) {
+  window.__poliWakeWordsBind = true
+  window.addEventListener('wake-words-changed', (event) => {
+    const words = Array.isArray(event?.detail) ? event.detail : []
+    WAKE_WORDS = words.length ? words : ['поли']
+    HOTWORD_RE = compileWakeRegex(WAKE_WORDS)
+  })
+}
+
+export function useSpeech({ onResult, onFinal, onInterim, onStart, onStop, onWake, onLevel, onStateChange } = {}){
   onResultCb  = onFinal || onResult || null
   onInterimCb = onInterim || null
   onWakeCb    = onWake || null
+  onLevelCb   = onLevel || null
+  onStateChangeCb = onStateChange || null
 
   function safeStart(){
-    if (!setup()) return
+    if (!setup()) return false
     if (!srRunning && !srStarting){
       try { srStarting = true; recognition.start() } catch {}
     }
+    return true
   }
 
   async function start(){
-    await ensureMicAccess()
+    const supported = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+    if (!supported) return false
+    const micOk = await ensureMicAccess()
+    if (!micOk) return false
     wantRunning = true; aborting = false
-    state = WAKE_ON ? STATE.ARMED : STATE.CAPTURE
-    safeStart()
+    MANUAL_CAPTURE = false
+    capture.buf=''; capture.interim=''; capture.startedAt=0
+    lastFinalText = ''
+    setState(WAKE_ON ? SPEECH_STATE.ARMED : SPEECH_STATE.CAPTURE, { reason: 'start' })
+    if (!WAKE_ON) {
+      capture.startedAt = Date.now()
+      armSilenceTimer()
+    }
+    const started = safeStart()
+    if (!started) return false
     onStart?.()
+    return true
   }
 
   function stop(){
     wantRunning = false
+    MANUAL_CAPTURE = false
     aborting = true
     srStarting = false
     try { recognition?.stop() } catch {}
-    state = STATE.IDLE
+    setState(SPEECH_STATE.IDLE, { reason: 'stop' })
     clearTimeout(capture.timer)
     capture.buf=''; capture.interim=''
     lastFinalText = ''
     onInterimCb?.('')
+    onLevelCb?.(0)
     onStop?.()
   }
 
   function forceCapture(){
     if (!wantRunning) start()
     try{ beep() }catch{}
-    state = STATE.CAPTURE
+    MANUAL_CAPTURE = true
+    setState(SPEECH_STATE.CAPTURE, { reason: 'manual' })
     capture.buf=''; capture.interim=''
     lastFinalText = ''
     capture.startedAt = Date.now()
@@ -266,7 +295,6 @@ export function useSpeech({ onResult, onFinal, onInterim, onStart, onStop, onWak
     armSilenceTimer()
   }
 
-  // глобальный «праймер» звука
   if (typeof window!=='undefined' && !window.__poliPrimeAudio){
     window.__poliPrimeAudio = function(){
       try{
@@ -279,7 +307,6 @@ export function useSpeech({ onResult, onFinal, onInterim, onStart, onStop, onWak
     }
   }
 
-  // если вкладка скрыта — не пытаемся перезапускать SR
   if (typeof document !== 'undefined' && !window.__poliVisBind){
     window.__poliVisBind = true
     document.addEventListener('visibilitychange', () => {
@@ -293,6 +320,14 @@ export function useSpeech({ onResult, onFinal, onInterim, onStart, onStop, onWak
     supported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
     setWakeEnabled: (v)=>{ WAKE_ON = !!v; save('wakeEnable', WAKE_ON) },
     setWindowMs: (ms)=>{ WINDOW_MS = +ms || 6000; save('wakeWindow', WINDOW_MS) },
-    getSettings: ()=>({ wake: WAKE_ON, windowMs: WINDOW_MS })
+    setWakeWords: (words)=>{
+      WAKE_WORDS = Array.isArray(words) && words.length ? words : ['поли']
+      save('wakeWords', WAKE_WORDS)
+      HOTWORD_RE = compileWakeRegex(WAKE_WORDS)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('wake-words-changed', { detail: WAKE_WORDS }))
+      }
+    },
+    getSettings: ()=>({ wake: WAKE_ON, windowMs: WINDOW_MS, wakeWords: WAKE_WORDS, state })
   }
 }

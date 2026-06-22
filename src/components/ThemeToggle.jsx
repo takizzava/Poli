@@ -1,35 +1,22 @@
-// src/components/ThemeToggle.jsx
 import { useEffect, useState } from 'react'
-import '../styles/theme.css'
 
 export default function ThemeToggle() {
-  // начальное значение: берем из LS, иначе — из media query
-  const prefersLight =
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-color-scheme: light)').matches
-
-  const [isLight, setIsLight] = useState(() => {
+  const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme')
-    return (saved ? saved === 'light' : prefersLight)
+    if (saved === 'light' || saved === 'dark') return saved
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    return prefersDark ? 'dark' : 'light'
   })
 
-  // применяем тему к документу и мета-цвету
   useEffect(() => {
-    document.documentElement.classList.toggle('light', isLight)
-    localStorage.setItem('theme', isLight ? 'light' : 'dark')
-    const meta = document.querySelector('meta[name=theme-color]')
-    if (meta) meta.setAttribute('content', isLight ? '#f8fafc' : '#0b1020')
-  }, [isLight])
+    document.documentElement.classList.toggle('light', theme === 'light')
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   return (
-    <button
-      className={`theme-toggle ${isLight ? 'light' : 'dark'}`}
-      onClick={() => setIsLight(v => !v)}
-      aria-label="Переключить тему"
-    >
-      <div className="theme-toggle-inner">
-        <span className="theme-icon">{isLight ? '☀️' : '🌙'}</span>
-      </div>
+    <button type="button" className="theme-toggle-simple" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+      {theme === 'light' ? 'Темная тема' : 'Светлая тема'}
     </button>
   )
 }

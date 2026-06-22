@@ -1,306 +1,262 @@
-// src/panels/VoicePanel.jsx
 import { useEffect, useRef, useState } from 'react'
 import MicButton from '../components/MicButton.jsx'
-import { useSpeech } from '../speech/useSpeech.js'
-import { parse, formatDueSpoken } from '../utils/parser.js'
+import { SPEECH_STATE, useSpeech } from '../speech/useSpeech.js'
+import { formatDueSpoken, parse } from '../utils/parser.js'
 import { askAI } from '../api/ai.js'
 import { createReminder } from '../api/reminders.js'
-import '../styles/voice-panel.css'
 
-// надёжный уникальный id
+const VOICE_MESSAGES_KEY = 'voicePanelMessages'
+const VOICE_LAST_TEXT_KEY = 'voicePanelLastText'
+
 const uid = () =>
-  (typeof crypto !== 'undefined' && crypto.randomUUID)
+  typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
-    : `m_${Date.now()}_${(uid.c = (uid.c || 0) + 1)}`
+    : `msg_${Date.now()}_${(uid.counter = (uid.counter || 0) + 1)}`
 
-export default function VoicePanel({ status, setStatus, heard, setHeard }) {
+function loadSavedMessages(fallback) {
+  try {
+    const raw = localStorage.getItem(VOICE_MESSAGES_KEY)
+    const parsed = JSON.parse(raw || '[]')
+    return Array.isArray(parsed) && parsed.length ? parsed : fallback
+  } catch {
+    return fallback
+  }
+}
+
+export default function VoicePanel({ status, setStatus, setHeard, onReminderCreated }) {
   const [listening, setListening] = useState(false)
   const [interim, setInterim] = useState('')
   const [woke, setWoke] = useState(false)
   const [messages, setMessages] = useState([])
   const [isProcessing, setIsProcessing] = useState(false)
-
-  const didWelcome = useRef(false)
+  const [skin, setSkin] = useState(() => localStorage.getItem('micSkin') || 'classic')
+  const [voiceLevel, setVoiceLevel] = useState(0)
+  const [speechSupported, setSpeechSupported] = useState(true)
+  const [speechState, setSpeechState] = useState(SPEECH_STATE.IDLE)
+  const [lastCreated, setLastCreated] = useState(null)
+  const [taskFlash, setTaskFlash] = useState(false)
   const chatRef = useRef(null)
+  const taskFlashRef = useRef(null)
 
-  // мягкий автоскролл вниз, когда приходят новые сообщения или interim
   useEffect(() => {
-    const el = chatRef.current
-    if (!el) return
-    // requestAnimationFrame, чтобы дождаться отрисовки
-    const raf = requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [messages, interim])
+    const handler = (event) => setSkin(event?.detail || localStorage.getItem('micSkin') || 'classic')
+    window.addEventListener('mic-skin-changed', handler)
+    return () => window.removeEventListener('mic-skin-changed', handler)
+  }, [])
 
-  const isReminder = (s = '') => {
-    const t = s.toLowerCase()
-    return (
-      t.includes('напомни') ||
-      t.includes('напоминан') ||
-      t.includes('создай напомин') ||
-      t.includes('добавь напомин')
-    )
-  }
+  useEffect(() => {
+    const ok = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+    setSpeechSupported(ok)
+    const welcome = ok ? 'Скажи: «Напомни завтра в 10 оплатить счет».' : 'Этот браузер не поддерживает SpeechRecognition.'
+    setStatus?.(welcome)
+    setMessages(loadSavedMessages([{ id: uid(), text: welcome, type: 'assistant', meta: 'система' }]))
+    const savedHeard = localStorage.getItem(VOICE_LAST_TEXT_KEY) || ''
+    setHeard?.(savedHeard)
+  }, [])
 
-  // добавление финальных сообщений в ленту
-  const addMessage = (text, type = 'user') => {
-    if (!text) return
-    setMessages((prev) => [...prev, { id: uid(), text, type }])
+  useEffect(() => {
+    const node = chatRef.current
+    if (!node) return
+    node.scrollTop = node.scrollHeight
+  }, [messages, interim, isProcessing])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VOICE_MESSAGES_KEY, JSON.stringify(messages.slice(-40)))
+    } catch {}
+  }, [messages])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VOICE_LAST_TEXT_KEY, interim || '')
+    } catch {}
+  }, [interim])
+
+  useEffect(() => () => window.clearTimeout(taskFlashRef.current), [])
+
+  const append = (text, type, meta = '') => setMessages((m) => [...m, { id: uid(), text, type, meta }])
+  const isReminderIntent = (v = '') => /\b(напомни|добавь|создай|поставь|запиши)\b/.test(v.toLowerCase())
+  const pulseTaskFlash = () => {
+    window.clearTimeout(taskFlashRef.current)
+    setTaskFlash(true)
+    taskFlashRef.current = window.setTimeout(() => setTaskFlash(false), 820)
   }
 
   const speech = useSpeech({
     onInterim: (text) => {
-      // interim выводим отдельно (не в messages) — никаких дублей и key-ворнингов
       setInterim(text || '')
       setHeard?.(text || '')
+      try {
+        localStorage.setItem(VOICE_LAST_TEXT_KEY, text || '')
+      } catch {}
     },
     onFinal: async (text) => {
       setInterim('')
       setHeard?.(text || '')
+      try {
+        localStorage.setItem(VOICE_LAST_TEXT_KEY, text || '')
+      } catch {}
       if (!text) return
-
-      // финальная фраза пользователя
-      addMessage(text, 'user')
-
+      append(text, 'user', 'голос')
       setIsProcessing(true)
 
-      if (isReminder(text)) {
-        const p = parse(text, new Date())
-        if (!p) {
-          const errorMsg =
-            'Не поняла дату/время. Скажи, например: «завтра в 12 купить хлеб».'
-          setStatus?.(errorMsg)
-          addMessage(errorMsg, 'assistant')
+      const parsed = parse(text, new Date())
+      if (isReminderIntent(text) || parsed) {
+        if (!parsed || !parsed.task) {
+          const msg = 'Не разобрала дату или задачу. Попробуй еще раз.'
+          setStatus?.(msg)
+          append(msg, 'assistant', 'ошибка')
           setIsProcessing(false)
           return
         }
-
-        const creatingMsg = `Создаю напоминание ${formatDueSpoken(p.due)}: ${p.task}`
-        setStatus?.(creatingMsg)
-        addMessage(creatingMsg, 'assistant')
-
         try {
-          await createReminder(p.task, p.due.getTime())
-          const successMsg = `✅ Создала напоминание: «${p.task}» на ${formatDueSpoken(
-            p.due
-          )}`
-          setStatus?.(successMsg)
-          addMessage(successMsg, 'assistant')
-        } catch (e) {
-          const msg = String(e?.message || '')
-          console.error('[createReminder]', msg)
-          const errorMsg = msg.includes('401')
-            ? '🔐 Нужно войти в аккаунт'
-            : '❌ Не удалось создать напоминание'
-          setStatus?.(errorMsg)
-          addMessage(errorMsg, 'assistant')
+          const saved = await createReminder(parsed.task, parsed.due.getTime())
+          await onReminderCreated?.()
+          setLastCreated({
+            id: saved?.id || uid(),
+            task: parsed.task,
+            due: parsed.due.toISOString(),
+            transcript: text,
+          })
+          pulseTaskFlash()
+          const ok = `Готово: ${parsed.task}, ${formatDueSpoken(parsed.due)}.`
+          setStatus?.(ok)
+          append(ok, 'assistant', 'успех')
+        } catch (error) {
+          const msg = error?.status === 409 ? 'Похожая задача уже существует. Новую запись не создала.' : 'Не удалось сохранить задачу.'
+          setStatus?.(msg)
+          append(msg, 'assistant', 'ошибка')
         }
       } else {
-        // Ответ ИИ (если ИИ пока не подключён — отловим ошибку и покажем сообщение)
-        setStatus?.('🤔 Думаю над ответом…')
         try {
           const { reply } = await askAI(text)
-          const aiResponse = reply || 'Готово.'
-          setStatus?.(aiResponse)
-          addMessage(aiResponse, 'assistant')
+          const out = reply || 'Нет ответа от ассистента.'
+          setStatus?.(out)
+          append(out, 'assistant', 'ответ')
         } catch {
-          const errorMsg = '❌ Извините, ответ сейчас недоступен.'
-          setStatus?.(errorMsg)
-          addMessage(errorMsg, 'assistant')
+          const msg = 'Ассистент недоступен.'
+          setStatus?.(msg)
+          append(msg, 'assistant', 'ошибка')
         }
       }
-
       setIsProcessing(false)
     },
     onStart: () => {
       setListening(true)
-      setStatus?.('🎤 Слушаю... Скажи «Поли» для активации')
+      const wakeEnabled = speech.getSettings().wake
+      setStatus?.(wakeEnabled ? 'Микрофон включен. Жду хот-слово.' : 'Микрофон включен. Слушаю команду.')
     },
     onStop: () => {
       setListening(false)
-      setStatus?.('Готов к работе')
+      setVoiceLevel(0)
+      setStatus?.('Микрофон выключен.')
       setInterim('')
     },
     onWake: () => {
       setWoke(true)
-      setTimeout(() => setWoke(false), 650)
-      setStatus?.('👂 Говори команду…')
-      // маленькая «подсказка» от ассистента
-      addMessage('👂 Слушаю вашу команду...', 'assistant')
+      setStatus?.('Ключевое слово услышано. Начинаю запись команды.')
+      window.setTimeout(() => setWoke(false), 420)
+    },
+    onLevel: (lvl) => setVoiceLevel(lvl),
+    onStateChange: (nextState) => {
+      setSpeechState(nextState)
+      if (nextState === SPEECH_STATE.ARMED) {
+        setStatus?.('Слышу микрофон. Жду хот-слово.')
+      } else if (nextState === SPEECH_STATE.CAPTURE && !isProcessing) {
+        setStatus?.('Говорите задачу. Текст появится ниже сразу.')
+      }
     },
   })
 
-  // единоразовое приветствие (без дублей при HMR)
-  useEffect(() => {
-    if (didWelcome.current) return
-    didWelcome.current = true
-    const welcomeMsg =
-      'Привет! Я Поли. Нажми на микрофон и скажи: «Поли, напомни завтра в двенадцать купить хлеб».'
-    setStatus?.(welcomeMsg)
-    addMessage(welcomeMsg, 'assistant')
-  }, [])
-
-  const clearChat = () => {
-    setMessages([])
-    setHeard?.('')
-    setInterim('')
-  }
+  const browserStatus = speechSupported ? 'Поддерживается в этом браузере' : 'Не поддерживается в этом браузере'
+  const modeLabel =
+    speechState === SPEECH_STATE.CAPTURE
+      ? 'Запись команды'
+      : speechState === SPEECH_STATE.ARMED
+        ? 'Ожидание хот-слова'
+        : 'Ожидание запуска'
 
   return (
-    <div className="voice-panel">
-      <div className="voice-card">
-        {/* Header */}
-        <div className="voice-header">
-          <div className="voice-title-section">
-            <div className="voice-icon">🎤</div>
-            <div>
-              <h2 className="voice-title">Голосовой помощник</h2>
-              <p className="voice-subtitle">Общайтесь с Поли голосом</p>
-            </div>
-          </div>
-
-          <button
-            className="clear-chat-btn"
-            onClick={clearChat}
-            disabled={messages.length === 0 && !interim}
-            title="Очистить историю"
-          >
-            <span className="clear-icon">🗑️</span>
-            Очистить
-          </button>
+    <div className={`voice-mobile ${taskFlash ? 'task-created' : ''}`}>
+      <div className="voice-success-flash" aria-hidden="true" />
+      <section className="voice-status-card">
+        <div className={`live-chip ${listening ? 'on' : 'off'}`}>{listening ? 'МИКРОФОН ВКЛЮЧЕН' : 'МИКРОФОН ВЫКЛЮЧЕН'}</div>
+        <div className="voice-status-main">{status}</div>
+        <div className="voice-meta">{browserStatus} • Скин: <b>{skin}</b> • Режим: <b>{modeLabel}</b></div>
+        <div className="voice-live-row">
+          <div className={`voice-phase ${speechState}`}>{modeLabel}</div>
+          <div className={`voice-hotword-indicator ${woke ? 'active' : ''}`}>{woke ? 'Хот-слово поймано' : 'Хот-слово не поймано'}</div>
         </div>
+      </section>
 
-        {/* Status Bar */}
-        <div className="voice-status-bar">
-          <div className="status-indicator">
-            <div
-              className={`status-dot ${listening ? 'listening' : ''} ${
-                isProcessing ? 'processing' : ''
-              }`}
-            />
-            <span className="status-text">
-              {status || (listening ? 'Слушаю...' : 'Готов к работе')}
-            </span>
-          </div>
+      <section className="voice-history-card" ref={chatRef}>
+        {messages.map((m) => (
+          <article key={m.id} className={`chat-item ${m.type}`}>
+            <p>{m.text}</p>
+          </article>
+        ))}
+        {interim && <article className="chat-item user interim"><p>{interim}</p></article>}
+        {isProcessing && <article className="chat-item assistant"><p>Обрабатываю...</p></article>}
+      </section>
+
+      <section className="voice-transcript-card">
+        <div className="voice-transcript-head">
+          <strong>Текст, который слышу</strong>
+          <span>{interim ? 'Обновляется в реальном времени' : 'Жду речь'}</span>
         </div>
-
-        {/* Chat */}
-        <div className="voice-chat" ref={chatRef}>
-          {messages.length === 0 && !interim ? (
-            <div className="empty-chat">
-              <div className="empty-chat-icon">🎯</div>
-              <h3 className="empty-chat-title">Начните разговор с Поли</h3>
-              <p className="empty-chat-description">
-                Нажмите на микрофон и скажите команду. Например:
-              </p>
-              <div className="example-commands">
-                <div className="example-command">
-                  «Поли, напомни завтра в 12 купить хлеб»
-                </div>
-                <div className="example-command">
-                  «Создай напоминание на пятницу встречу с друзьями»
-                </div>
-                <div className="example-command">«Сколько будет 2+2?»</div>
-              </div>
-            </div>
-          ) : (
-            <div className="chat-messages">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`chat-message ${
-                    message.type === 'user' ? 'user-message' : 'assistant-message'
-                  }`}
-                >
-                  <div className="message-avatar">
-                    {message.type === 'user' ? '👤' : ''}
-                  </div>
-                  <div className="message-content">
-                    <div className="message-bubble">{message.text}</div>
-                    <div className="message-time">
-                      {new Date().toLocaleTimeString('ru-RU', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Эфемерный typing-пузырь пользователя */}
-              {interim && (
-                <div className="chat-message user-message typing-message" key="__typing">
-                  <div className="message-avatar">👤</div>
-                  <div className="message-content">
-                    <div className="message-bubble">
-                      {interim}
-                      <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    </div>
-                    <div className="message-time">
-                      {new Date().toLocaleTimeString('ru-RU', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Индикация «думаю» — когда ждём ответ ИИ */}
-              {isProcessing && !interim && (
-                <div className="chat-message assistant-message" key="__thinking">
-                  <div className="message-avatar" />
-                  <div className="message-content">
-                    <div className="message-bubble">
-                      🤔 Думаю над ответом…
-                      <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+        <div className={`voice-transcript-body ${interim ? 'active' : ''}`}>
+          {interim || 'После начала речи здесь сразу появится распознанный текст.'}
         </div>
+      </section>
 
-        {/* Microphone Button */}
-        <div className="mic-container">
-          <MicButton
-            listening={listening}
-            woke={woke}
-            onClick={() =>
-              listening
-                ? speech.stop()
-                : (window.__poliPrimeAudio && window.__poliPrimeAudio(), speech.start())
+      {lastCreated ? (
+        <section className="voice-created-card">
+          <div className="created-badge">Задача сохранена</div>
+          <strong>{lastCreated.task}</strong>
+          <span>{formatDueSpoken(new Date(lastCreated.due))}</span>
+          <p>Фраза: {lastCreated.transcript}</p>
+        </section>
+      ) : null}
+
+      <section className="voice-dock">
+        <MicButton
+          listening={listening}
+          woke={woke}
+          mode={speechState}
+          voiceLevel={voiceLevel}
+          onClick={async () => {
+            if (listening) {
+              speech.stop()
+              return
             }
-            onHold={async () => {
-              if (!listening) speech.start()
-              speech.forceCapture()
-            }}
-          />
-        </div>
-
-        {/* Browser Support Warning */}
-        {!speech.supported && (
-          <div className="browser-warning">
-            <div className="warning-icon">⚠️</div>
-            <div className="warning-text">
-              <strong>Ваш браузер не поддерживает голосовой ввод</strong>
-              <br />
-              Попробуйте использовать Chrome, Edge или Safari
-            </div>
-          </div>
-        )}
-      </div>
+            if (window.__poliPrimeAudio) window.__poliPrimeAudio()
+            const ok = await speech.start()
+            if (!ok) {
+              setStatus?.('Не удалось запустить микрофон. Проверь разрешения и поддержку браузера.')
+            }
+          }}
+          onHold={async () => {
+            if (!listening) {
+              const ok = await speech.start()
+              if (!ok) return
+            }
+            speech.forceCapture?.()
+          }}
+        />
+        <button
+          type="button"
+          className="ghost-action"
+          onClick={() => {
+            setMessages([])
+            setLastCreated(null)
+            setInterim('')
+            localStorage.removeItem(VOICE_MESSAGES_KEY)
+            localStorage.removeItem(VOICE_LAST_TEXT_KEY)
+          }}
+        >
+          Очистить
+        </button>
+      </section>
     </div>
   )
 }

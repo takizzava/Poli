@@ -1,33 +1,38 @@
-// server/db.js — SSL toggle; returns rows[]
-import pg from 'pg'
+﻿import fs from 'fs'
+import path from 'path'
+import { DatabaseSync } from 'node:sqlite'
 import dotenv from 'dotenv'
+
 dotenv.config()
 
-const { Pool } = pg
+const dbFile = process.env.SQLITE_FILE || path.resolve(process.cwd(), 'server', 'data', 'app.sqlite')
+fs.mkdirSync(path.dirname(dbFile), { recursive: true })
 
-function sslEnabled(){
-  const flag = (process.env.PGSSL || '').toString().toLowerCase().trim()
-  if (flag === '1' || flag === 'true' || flag === 'on') return true
-  return false
+const db = new DatabaseSync(dbFile)
+db.exec('PRAGMA foreign_keys = ON;')
+db.exec('PRAGMA journal_mode = WAL;')
+
+function convertPositional(sql, params) {
+  const order = []
+  const text = sql.replace(/\$(\d+)/g, (_m, g1) => {
+    order.push(Number(g1) - 1)
+    return '?'
+  })
+  const nextParams = order.length ? order.map((idx) => params[idx]) : params
+  return { text, params: nextParams }
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // IMPORTANT: force-disable SSL for local DB unless PGSSL=1
-  ssl: sslEnabled() ? { rejectUnauthorized: false } : false
-})
+export async function query(sql, params = []) {
+  const { text, params: bind } = convertPositional(sql, params)
+  const stmt = db.prepare(text)
+  const lower = text.trim().toLowerCase()
 
-export async function query(q, params = []){
-  const client = await pool.connect()
-  try{
-    const res = await client.query(q, params)
-    return res.rows
-  } catch(e){
-    console.error('[db] query failed:', e?.message || e)
-    throw e
-  } finally {
-    client.release()
+  if (lower.startsWith('select') || lower.includes(' returning ')) {
+    return stmt.all(...bind)
   }
+
+  stmt.run(...bind)
+  return []
 }
 
-export default pool
+export default db

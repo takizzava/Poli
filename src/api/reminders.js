@@ -18,7 +18,10 @@ export async function createReminder(text, due){
   if (!r.ok) {
     const t = await r.text().catch(()=> '')
     console.error('[createReminder] HTTP', r.status, t)
-    throw new Error('create failed: ' + r.status + ' ' + t)
+    const err = new Error('create failed: ' + r.status + ' ' + t)
+    err.status = r.status
+    err.payload = t
+    throw err
   }
   return await r.json()
 }

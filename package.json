@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"npm:dev:*\"",
+    "dev": "node server/scripts/dev-runner.js",
     "dev:client": "vite",
     "dev:server": "nodemon server/index.js",
-    "build": "vite build && rm -rf server/public && mkdir -p server/public && cp -r dist/* server/public/",
+    "build": "vite build && node server/scripts/sync-dist.js",
+    "test": "node --test tests/**/*.test.js",
     "start": "node server/index.js",
     "postinstall": "node server/scripts/init-db.js"
   },
@@ -20,16 +21,16 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
+    "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "node-schedule": "^2.1.1",
     "pg": "^8.16.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "uuid": "^9.0.1",
     "web-push": "^3.6.6"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^9.0.1",
     "nodemon": "^3.1.7",
     "vite": "^5.4.10"

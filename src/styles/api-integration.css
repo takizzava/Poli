@@ -1,0 +1,102 @@
+.api-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.api-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toggles {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.actions-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.token-create {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.token-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  flex-wrap: wrap;
+}
+
+.token-name {
+  font-weight: 700;
+}
+
+.token-meta {
+  font-size: 0.85rem;
+}
+
+.token-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.token-inline {
+  background: rgba(0,0,0,0.3);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+.token-hint {
+  background: rgba(122, 162, 255, 0.1);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 640px) {
+  .token-create {
+    flex-direction: column;
+  }
+
+  .actions-row {
+    flex-direction: column;
+  }
+}

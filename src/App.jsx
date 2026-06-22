@@ -2,173 +2,97 @@ import { useEffect, useMemo, useState } from 'react'
 import VoicePanel from './panels/VoicePanel.jsx'
 import CreatePanel from './panels/CreatePanel.jsx'
 import TasksPanel from './panels/TasksPanel.jsx'
+import KanbanPanel from './panels/KanbanPanel.jsx'
+import CalendarPanel from './panels/CalendarPanel.jsx'
+import HabitsPanel from './panels/HabitsPanel.jsx'
 import SettingsPanel from './panels/SettingsPanel.jsx'
+import ProfilePanel from './panels/ProfilePanel.jsx'
 import AuthPanel from './panels/AuthPanel.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
-import UserBadge from './components/UserBadge.jsx'
-import { listReminders, createReminder, deleteReminder } from './api/reminders.js'
+import { createReminder, deleteReminder, listReminders } from './api/reminders.js'
 import { me } from './api/auth.js'
 
 const TABS = [
-  { id: 'voice', icon: '🎤', label: 'Голос' },
-  { id: 'create', icon: '➕', label: 'Создать' },
-  { id: 'tasks', icon: '🗂', label: 'Задачи' },
-  { id: 'settings', icon: '⚙️', label: 'Настройки' },
-  { id: 'auth', icon: '🔐', label: 'Аккаунт' }
+  { key: 'voice', label: 'Голос' },
+  { key: 'tasks', label: 'Задачи' },
+  { key: 'kanban', label: 'Канбан' },
+  { key: 'calendar', label: 'Календарь' },
+  { key: 'habits', label: 'Привычки' },
+  { key: 'create', label: 'Создать' },
+  { key: 'settings', label: 'Настройки' },
+  { key: 'profile', label: 'Профиль' },
 ]
 
-export default function App(){
-  const [tab, setTab] = useState('voice')
-  const [status, setStatus] = useState('Готова. Скажи «Поли».')
-  const [heard, setHeard] = useState('')
+export default function App() {
   const [items, setItems] = useState([])
   const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('voice')
+  const [status, setStatus] = useState('Система готова к работе.')
+  const [heard, setHeard] = useState('')
 
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        const saved = localStorage.getItem('theme') || 'dark'
-        document.documentElement.classList.toggle('light', saved === 'light')
-        
-        const [userData, remindersData] = await Promise.all([
-          me().catch(() => null),
-          listReminders().catch(() => [])
-        ])
-        
-        setUser(userData)
-        setItems(remindersData)
-        
-        // Service Worker setup for push notifications
-        if ('serviceWorker' in navigator){
-          navigator.serviceWorker.addEventListener('message', (e)=>{
-            if (e?.data?.type === 'edi-push'){
-              const d = e.data.data || {}
-              setStatus('🔔 '+(d.title||'Пуш')+': '+(d.body||''))
-            }
-          })
-        }
-      } catch (error) {
-        console.error('Initialization error:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    initializeApp()
+    const savedTheme = localStorage.getItem('theme') || 'light'
+    document.documentElement.classList.toggle('light', savedTheme === 'light')
+    document.documentElement.classList.toggle('dark', savedTheme === 'dark')
+    me().then(setUser).catch(() => null)
+    listReminders().then(setItems).catch(() => setItems([]))
   }, [])
 
-  async function refresh(){ 
-    try {
-      const updatedItems = await listReminders()
-      setItems(updatedItems)
-    } catch (error) {
-      console.error('Refresh error:', error)
-    }
+  async function refresh() {
+    const nextItems = await listReminders()
+    setItems(nextItems)
   }
 
-  const api = useMemo(() => ({
-    create: async (text, due) => { 
-      await createReminder(text, due); 
-      await refresh() 
-    },
-    remove: async (id) => { 
-      await deleteReminder(id); 
-      await refresh() 
-    }
-  }), [])
-
-  if (isLoading) {
-    return (
-      <div className="app-loading">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <div className="loading-text">Загружаем Поли...</div>
-        </div>
-      </div>
-    )
-  }
+  const api = useMemo(
+    () => ({
+      create: async (text, due) => {
+        await createReminder(text, due)
+        await refresh()
+      },
+      remove: async (id) => {
+        await deleteReminder(id)
+        await refresh()
+      },
+      refresh,
+    }),
+    []
+  )
 
   return (
-<div className="app">
-      {/* Header */}
-      <header className="header">
-        <div className="header-content">
-          <div className="brand">
-            <div className="logo-wrapper">
-              <div className="logo"></div>
-              <div className="brand-gradient"></div>
-            </div>
-            <div className="brand-text">
-              <div className="title">Поли</div>
-              <div className="subtitle">Умный голосовой помощник</div>
-            </div>
-          </div>
-
-          <div className="header-controls">
-            <ThemeToggle />
-            <UserBadge user={user} isLoading={isLoading} />
-          </div>
+    <div className="mobile-shell">
+      <header className="mobile-top">
+        <div>
+          <h1>ГласПлан</h1>
+          <p>{user?.email || 'Голосовой планировщик для телефона'}</p>
         </div>
+        <ThemeToggle />
       </header>
 
-      {/* Navigation */}
-      <nav className="navigation">
-        <div className="nav-container">
-          {TABS.map(({ id, icon, label }) => (
-            <button 
-              key={id}
-              className={`nav-tab ${tab === id ? 'nav-tab--active' : ''}`}
-              onClick={() => setTab(id)}
-              aria-selected={tab === id}
-            >
-              <span className="nav-tab__icon">{icon}</span>
-              <span className="nav-tab__label">{label}</span>
-              <div className="nav-tab__indicator"></div>
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="main">
-        <div className="main-container">
-          {tab === 'voice' && (
-            <VoicePanel 
-              status={status} 
-              setStatus={setStatus} 
-              heard={heard} 
-              setHeard={setHeard} 
-            />
-          )}
-          {tab === 'create' && <CreatePanel api={api} />}
-          {tab === 'tasks' && <TasksPanel items={items} api={api} />}
-          {tab === 'settings' && <SettingsPanel />}
-          {tab === 'auth' && (
-            <AuthPanel 
-              onAuthed={(u) => { 
-                setUser(u); 
-                setTab('voice'); 
-              }} 
-            />
-          )}
-        </div>
+      <main className="mobile-content">
+        {activeTab === 'voice' && <VoicePanel user={user} status={status} setStatus={setStatus} setHeard={setHeard} onReminderCreated={refresh} />}
+        {activeTab === 'tasks' && <TasksPanel items={items} api={api} />}
+        {activeTab === 'kanban' && <KanbanPanel items={items} />}
+        {activeTab === 'calendar' && <CalendarPanel items={items} />}
+        {activeTab === 'habits' && <HabitsPanel />}
+        {activeTab === 'create' && <CreatePanel api={api} />}
+        {activeTab === 'settings' && <SettingsPanel />}
+        {activeTab === 'profile' && (
+          user ? <ProfilePanel user={user} onUpdated={setUser} /> : <AuthPanel onAuthed={setUser} onLoggedOut={() => setUser(null)} />
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="footer">
-        <div className="footer-content">
-          <div className="footer-info">
-            <div className="app-version">v1.0.0</div>
-            <div className="copyright">© {new Date().getFullYear()} Поли</div>
-          </div>
-          <div className="status-bar">
-            <div className={`status-indicator ${status.includes('🔔') ? 'status-indicator--notification' : ''}`}>
-              {status}
-            </div>
-          </div>
-        </div>
-      </footer>
+      <nav className="bottom-nav" aria-label="Главная навигация">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            className={`nav-btn ${activeTab === tab.key ? 'is-active' : ''}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }

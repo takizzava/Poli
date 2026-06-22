@@ -1,89 +1,58 @@
-/* User Badge Styles */
 .user-badge {
   display: flex;
   align-items: center;
-  gap: var(--space-sm, 0.5rem);
-  padding: var(--space-sm, 0.5rem) var(--space-md, 1rem);
-  background: var(--gradient-glass, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-md, 0.5rem);
-  backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
-  cursor: default;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line-soft);
 }
 
-.user-badge:hover {
-  background: var(--gradient-glass-hover, rgba(255, 255, 255, 0.08));
-  border-color: var(--line-hover, rgba(255, 255, 255, 0.15));
+.user-badge.guest {
+  opacity: 0.9;
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  border-radius: 50%;
-  background: var(--gradient-primary, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 0.875rem;
-  flex-shrink: 0;
-  user-select: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(71, 240, 255, 0.96), rgba(96, 167, 255, 0.88));
+  color: #04101e;
+  font-weight: 800;
+}
+
+.user-copy {
+  display: grid;
+  min-width: 0;
 }
 
 .user-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text, #ffffff);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px;
+  font-weight: 700;
+  color: var(--text-strong);
 }
 
-/* Loading states */
-.user-badge--loading {
-  opacity: 0.6;
-  pointer-events: none;
+.user-role {
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
 }
 
 .user-avatar--skeleton,
 .user-name--skeleton {
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
-  background: var(--skeleton-bg, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-sm, 0.25rem);
-}
-
-.user-avatar--skeleton {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  background-size: 200% 100%;
+  animation: skeletonFlow 1.4s linear infinite;
 }
 
 .user-name--skeleton {
   height: 14px;
-  width: 80px;
+  width: 84px;
+  border-radius: 999px;
 }
 
-@keyframes skeleton-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+.user-role.short {
+  width: 54px;
 }
-
-/* Responsive */
-@media (max-width: 768px) {
-  .user-name {
-    display: none;
-  }
-  
-  .user-badge {
-    padding: var(--space-sm, 0.5rem);
-  }
-}
-
