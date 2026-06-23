@@ -45,6 +45,7 @@ export function stripHotword(t, re = HOTWORD_RE) { return t.replace(re, (_m, lef
 export function normalizeTranscript(text = '') {
   return String(text)
     .replace(/\s+/g, ' ')
+    .trim()
     .replace(/[.,!?…]+$/u, '')
     .trim()
 }
