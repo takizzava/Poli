@@ -7,6 +7,7 @@ import { createReminder } from '../api/reminders.js'
 
 const VOICE_MESSAGES_KEY = 'voicePanelMessages'
 const VOICE_LAST_TEXT_KEY = 'voicePanelLastText'
+const VOICE_TRANSCRIPT_KEY = 'voicePanelTranscriptText'
 
 const uid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
@@ -35,6 +36,7 @@ export default function VoicePanel({ status, setStatus, setHeard, onReminderCrea
   const [speechState, setSpeechState] = useState(SPEECH_STATE.IDLE)
   const [lastCreated, setLastCreated] = useState(null)
   const [taskFlash, setTaskFlash] = useState(false)
+  const [transcriptText, setTranscriptText] = useState('')
   const chatRef = useRef(null)
   const taskFlashRef = useRef(null)
 
@@ -51,7 +53,9 @@ export default function VoicePanel({ status, setStatus, setHeard, onReminderCrea
     setStatus?.(welcome)
     setMessages(loadSavedMessages([{ id: uid(), text: welcome, type: 'assistant', meta: 'система' }]))
     const savedHeard = localStorage.getItem(VOICE_LAST_TEXT_KEY) || ''
+    const savedTranscript = localStorage.getItem(VOICE_TRANSCRIPT_KEY) || ''
     setHeard?.(savedHeard)
+    setTranscriptText(savedTranscript || savedHeard)
   }, [])
 
   useEffect(() => {
@@ -72,6 +76,12 @@ export default function VoicePanel({ status, setStatus, setHeard, onReminderCrea
     } catch {}
   }, [interim])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(VOICE_TRANSCRIPT_KEY, transcriptText || '')
+    } catch {}
+  }, [transcriptText])
+
   useEffect(() => () => window.clearTimeout(taskFlashRef.current), [])
 
   const append = (text, type, meta = '') => setMessages((m) => [...m, { id: uid(), text, type, meta }])
@@ -84,17 +94,22 @@ export default function VoicePanel({ status, setStatus, setHeard, onReminderCrea
 
   const speech = useSpeech({
     onInterim: (text) => {
-      setInterim(text || '')
-      setHeard?.(text || '')
+      const nextText = text || ''
+      setInterim(nextText)
+      setTranscriptText(nextText)
+      setHeard?.(nextText)
       try {
-        localStorage.setItem(VOICE_LAST_TEXT_KEY, text || '')
+        localStorage.setItem(VOICE_LAST_TEXT_KEY, nextText)
+        localStorage.setItem(VOICE_TRANSCRIPT_KEY, nextText)
       } catch {}
     },
     onFinal: async (text) => {
       setInterim('')
+      setTranscriptText(text || '')
       setHeard?.(text || '')
       try {
         localStorage.setItem(VOICE_LAST_TEXT_KEY, text || '')
+        localStorage.setItem(VOICE_TRANSCRIPT_KEY, text || '')
       } catch {}
       if (!text) return
       append(text, 'user', 'голос')
@@ -202,10 +217,10 @@ export default function VoicePanel({ status, setStatus, setHeard, onReminderCrea
       <section className="voice-transcript-card">
         <div className="voice-transcript-head">
           <strong>Текст, который слышу</strong>
-          <span>{interim ? 'Обновляется в реальном времени' : 'Жду речь'}</span>
+          <span>{interim ? 'Обновляется в реальном времени' : transcriptText ? 'Последняя распознанная фраза' : 'Жду речь'}</span>
         </div>
-        <div className={`voice-transcript-body ${interim ? 'active' : ''}`}>
-          {interim || 'После начала речи здесь сразу появится распознанный текст.'}
+        <div className={`voice-transcript-body ${interim || transcriptText ? 'active' : ''}`}>
+          {interim || transcriptText || 'После начала речи здесь сразу появится распознанный текст.'}
         </div>
       </section>
 
@@ -250,8 +265,10 @@ export default function VoicePanel({ status, setStatus, setHeard, onReminderCrea
             setMessages([])
             setLastCreated(null)
             setInterim('')
+            setTranscriptText('')
             localStorage.removeItem(VOICE_MESSAGES_KEY)
             localStorage.removeItem(VOICE_LAST_TEXT_KEY)
+            localStorage.removeItem(VOICE_TRANSCRIPT_KEY)
           }}
         >
           Очистить
