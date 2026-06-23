@@ -1,29 +1,32 @@
-import { useEffect, useState } from 'react'
-import { login, logout, me, signup } from '../api/auth.js'
+import { useState } from 'react'
+import { login, logout, signup } from '../api/auth.js'
+
+const AUTH_COPY = {
+  login: {
+    eyebrow: 'Безопасный вход',
+    title: 'Авторизуйтесь, чтобы открыть рабочее пространство',
+    description: 'После входа станут доступны голосовой помощник, задачи, календарь и персональные настройки.',
+    button: 'Войти',
+    loading: 'Выполняем вход...',
+  },
+  signup: {
+    eyebrow: 'Новый аккаунт',
+    title: 'Создайте аккаунт и сохраните данные в своей сессии',
+    description: 'Регистрация сразу открывает доступ ко всем функциям приложения и включает персональное хранение.',
+    button: 'Создать аккаунт',
+    loading: 'Создаём аккаунт...',
+  },
+}
 
 export default function AuthPanel({ onAuthed, onLoggedOut }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [status, setStatus] = useState('Проверяем состояние сессии...')
+  const [status, setStatus] = useState('Войдите или зарегистрируйтесь, чтобы продолжить работу.')
   const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const currentUser = await me()
-        setUser(currentUser)
-        setStatus(`Сессия активна: ${currentUser.email}`)
-      } catch {
-        setStatus('Вход не выполнен.')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    checkSession()
-  }, [])
+  const view = AUTH_COPY[activeTab]
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -32,13 +35,14 @@ export default function AuthPanel({ onAuthed, onLoggedOut }) {
     }
 
     setIsLoading(true)
-    setStatus(activeTab === 'login' ? 'Выполняем вход...' : 'Создаем аккаунт...')
+    setStatus(view.loading)
 
     try {
       const currentUser =
         activeTab === 'login'
           ? await login(email.trim(), password)
           : await signup(email.trim(), password)
+
       setUser(currentUser)
       setStatus(`Готово: ${currentUser.email}`)
       onAuthed?.(currentUser)
@@ -66,70 +70,88 @@ export default function AuthPanel({ onAuthed, onLoggedOut }) {
   }
 
   return (
-    <div className="auth-panel">
-      <div className="auth-status">{status}</div>
-
-      {!user ? (
-        <div className="auth-box">
-          <div className="auth-tabs">
-            <button
-              type="button"
-              className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
-              onClick={() => setActiveTab('login')}
-              disabled={isLoading}
-            >
-              Вход
-            </button>
-            <button
-              type="button"
-              className={`auth-tab ${activeTab === 'signup' ? 'active' : ''}`}
-              onClick={() => setActiveTab('signup')}
-              disabled={isLoading}
-            >
-              Регистрация
-            </button>
-          </div>
-
-          <div className="auth-form">
-            <label className="auth-field">
-              <span>Email</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                disabled={isLoading}
-              />
-            </label>
-
-            <label className="auth-field">
-              <span>Пароль</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={isLoading}
-              />
-            </label>
-
-            <button type="button" className="auth-action" onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? 'Обрабатываем...' : activeTab === 'login' ? 'Войти' : 'Создать аккаунт'}
-            </button>
-          </div>
+    <section className="auth-panel">
+      <div className="auth-box auth-hero">
+        <div className="auth-copy">
+          <span className="auth-kicker">{view.eyebrow}</span>
+          <h2>{view.title}</h2>
+          <p>{view.description}</p>
         </div>
-      ) : (
-        <div className="auth-box user">
-          <div className="user-line">
-            <div className="user-avatar">{user.email?.[0]?.toUpperCase() || 'U'}</div>
-            <div>
-              <div className="user-name">{user.email}</div>
-              <div className="muted">Активная серверная сессия</div>
+
+        <div className="auth-status" role="status" aria-live="polite">
+          {status}
+        </div>
+
+        {!user ? (
+          <>
+            <div className="auth-tabs" role="tablist" aria-label="Режим авторизации">
+              <button
+                type="button"
+                className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
+                onClick={() => setActiveTab('login')}
+                disabled={isLoading}
+              >
+                Вход
+              </button>
+              <button
+                type="button"
+                className={`auth-tab ${activeTab === 'signup' ? 'active' : ''}`}
+                onClick={() => setActiveTab('signup')}
+                disabled={isLoading}
+              >
+                Регистрация
+              </button>
             </div>
+
+            <div className="auth-form">
+              <label className="auth-field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  disabled={isLoading}
+                  autoComplete="email"
+                />
+              </label>
+
+              <label className="auth-field">
+                <span>Пароль</span>
+                <input
+                  type="password"
+                  placeholder="Не менее 6 символов"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  disabled={isLoading}
+                  autoComplete={activeTab === 'login' ? 'current-password' : 'new-password'}
+                />
+              </label>
+
+              <button type="button" className="auth-action" onClick={handleSubmit} disabled={isLoading}>
+                {isLoading ? 'Обрабатываем...' : view.button}
+              </button>
+            </div>
+
+            <div className="auth-note">
+              Все рабочие панели скрыты, пока не выполнен вход. Это защищает персональные данные и историю напоминаний.
+            </div>
+          </>
+        ) : (
+          <div className="auth-box auth-box-user">
+            <div className="user-line">
+              <div className="user-avatar">{user.email?.[0]?.toUpperCase() || 'U'}</div>
+              <div>
+                <div className="user-name">{user.email}</div>
+                <div className="muted">Активная серверная сессия</div>
+              </div>
+            </div>
+            <button type="button" className="auth-action ghost" onClick={handleLogout} disabled={isLoading}>
+              {isLoading ? '...' : 'Выйти'}
+            </button>
           </div>
-          <button type="button" className="auth-action ghost" onClick={handleLogout} disabled={isLoading}>
-            {isLoading ? '...' : 'Выйти'}
-          </button>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </section>
   )
 }

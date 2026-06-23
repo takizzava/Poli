@@ -62,9 +62,17 @@ r.post('/subscribe', withAuth, async (req, res) => {
 r.post('/debug/push-now', withAuth, async (req, res) => {
   try {
     const subs = await query('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1', [req.user.id])
-    if (!subs.length) return res.status(404).json({ error: 'no_subscriptions' })
+    if (!subs.length) {
+      return res.status(404).json({
+        ok: false,
+        error: 'Нет активных push-подписок. Сначала подключите web push в настройках.',
+      })
+    }
 
-    const payload = JSON.stringify({ title: 'Поли', body: 'Пуш работает! Это тестовое уведомление.', url: '/' })
+    const title = String(req.body?.title || 'ГласПлан')
+    const body = String(req.body?.body || 'Пуш работает. Это тестовое уведомление.')
+    const url = String(req.body?.url || '/')
+    const payload = JSON.stringify({ title, body, url })
     const results = []
 
     for (const s of subs) {
@@ -84,8 +92,8 @@ r.post('/debug/push-now', withAuth, async (req, res) => {
     }
 
     res.json({ ok: true, results })
-  } catch {
-    res.status(500).json({ error: 'push_failed' })
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error?.message || 'push_failed' })
   }
 })
 

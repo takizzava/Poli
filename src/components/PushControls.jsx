@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { emitAppNotification } from './InAppNotifications.jsx'
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -41,12 +42,11 @@ export default function PushControls() {
       }
 
       const registration = await ensureServiceWorker()
-      const { key } = await fetch('/api/vapidPublicKey', { credentials: 'include' }).then((response) =>
-        response.json()
-      )
+      const vapidRes = await fetch('/api/vapidPublicKey', { credentials: 'include' })
+      const { key } = await vapidRes.json()
 
       if (!key) {
-        throw new Error('Публичный VAPID ключ не настроен.')
+        throw new Error('Публичный VAPID-ключ не настроен.')
       }
 
       let subscription = await registration.pushManager.getSubscription()
@@ -69,7 +69,7 @@ export default function PushControls() {
         throw new Error(`Сервер не принял push-подписку (${response.status}). ${txt}`)
       }
 
-      setState({ type: 'success', text: 'Push-канал активирован и готов к доставке.' })
+      setState({ type: 'success', text: 'Веб-push подключён. Теперь можно отправлять серверный тест.' })
     } catch (error) {
       setState({ type: 'error', text: error.message || 'Не удалось активировать push.' })
     } finally {
@@ -86,23 +86,38 @@ export default function PushControls() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: 'Тестовое уведомление из VoiceOps' }),
+        body: JSON.stringify({
+          title: 'ГласПлан',
+          body: 'Тестовое push-уведомление отправлено с сервера.',
+          url: '/',
+        }),
       })
+
       const payload = await response.json().catch(() => ({}))
 
       if (!response.ok || !payload.ok) {
-        throw new Error(`Сервер не подтвердил отправку теста (${response.status}).`)
+        throw new Error(payload.error || `Сервер не подтвердил отправку теста (${response.status}).`)
       }
 
-      const details = Array.isArray(payload.results)
+      const details = Array.isArray(payload.results) && payload.results.length
         ? payload.results.map((item) => `#${item.id}: ${item.status}${item.deleted ? ' (удалена)' : ''}`).join(', ')
-        : 'результат без деталей'
-      setState({ type: 'success', text: `Тестовый push отправлен. ${details}` })
+        : 'подписки не найдены'
+
+      setState({ type: 'success', text: `Серверный push отправлен. ${details}` })
     } catch (error) {
       setState({ type: 'error', text: error.message || 'Тестовый push не отправлен.' })
     } finally {
       setLoadingAction('')
     }
+  }
+
+  const showInAppTest = () => {
+    emitAppNotification({
+      title: 'Внутреннее уведомление',
+      body: 'Это локальный тест внутри приложения. Он не зависит от Chrome push или service worker.',
+      tone: 'success',
+    })
+    setState({ type: 'success', text: 'Внутреннее уведомление показано прямо в интерфейсе.' })
   }
 
   const resubscribePush = async () => {
@@ -124,37 +139,60 @@ export default function PushControls() {
       const supported = 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined'
       const permission = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
       let subState = 'нет service worker'
+
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration()
         const sub = reg ? await reg.pushManager.getSubscription() : null
         subState = sub ? 'подписка есть' : 'подписки нет'
       }
-      setDiag(`Поддержка: ${supported ? 'да' : 'нет'} • Разрешение: ${permission} • Состояние: ${subState}`)
-    } catch (e) {
-      setDiag(`Диагностика не удалась: ${e.message || 'unknown error'}`)
+
+      setDiag(`Поддержка: ${supported ? 'да' : 'нет'} | Разрешение: ${permission} | Состояние: ${subState}`)
+    } catch (error) {
+      setDiag(`Диагностика не удалась: ${error.message || 'unknown error'}`)
     }
   }
 
   return (
     <div className="push-controls">
-      <div className="push-actions">
-        <button type="button" className="btn secondary" onClick={activatePush} disabled={!!loadingAction}>
-          {loadingAction === 'enable' ? 'Подключаем...' : 'Активировать push'}
-        </button>
-        <button type="button" className="btn secondary" onClick={resubscribePush} disabled={!!loadingAction}>
-          {loadingAction === 'resubscribe' ? 'Обновляем...' : 'Переподписать push'}
-        </button>
-        <button type="button" className="btn secondary" onClick={sendTestPush} disabled={!!loadingAction}>
-          {loadingAction === 'test' ? 'Отправляем...' : 'Отправить тест'}
-        </button>
-        <button type="button" className="btn secondary" onClick={runDiagnostics} disabled={!!loadingAction}>
-          Проверить Chrome
-        </button>
+      <div className="push-panel-grid">
+        <section className="push-panel">
+          <div className="push-panel-copy">
+            <span className="push-kicker">Web Push</span>
+            <h5>Браузерные уведомления</h5>
+            <p>Используйте этот канал, если хотите получать уведомления через Service Worker даже вне активной вкладки.</p>
+          </div>
+          <div className="push-actions">
+            <button type="button" className="btn secondary" onClick={activatePush} disabled={!!loadingAction}>
+              {loadingAction === 'enable' ? 'Подключаем...' : 'Активировать push'}
+            </button>
+            <button type="button" className="btn secondary" onClick={resubscribePush} disabled={!!loadingAction}>
+              {loadingAction === 'resubscribe' ? 'Обновляем...' : 'Переподписать push'}
+            </button>
+            <button type="button" className="btn secondary" onClick={sendTestPush} disabled={!!loadingAction}>
+              {loadingAction === 'test' ? 'Отправляем...' : 'Отправить серверный тест'}
+            </button>
+            <button type="button" className="btn secondary" onClick={runDiagnostics} disabled={!!loadingAction}>
+              Проверить окружение
+            </button>
+          </div>
+        </section>
+
+        <section className="push-panel push-panel--app">
+          <div className="push-panel-copy">
+            <span className="push-kicker">In-App</span>
+            <h5>Внутренние уведомления</h5>
+            <p>Этот тест работает прямо в интерфейсе и не зависит от поддержки Chrome уведомлений или push-подписки.</p>
+          </div>
+          <div className="push-actions push-actions--single">
+            <button type="button" className="btn" onClick={showInAppTest}>
+              Показать внутреннее уведомление
+            </button>
+          </div>
+        </section>
       </div>
 
       <div className="push-hint">
-        Используйте сначала активацию, затем тест доставки. Оба сценария работают без перезагрузки
-        экрана.
+        Если серверный push не проходит, сначала проверьте разрешение браузера и наличие подписки. Для быстрой проверки интерфейса используйте внутренний канал.
       </div>
 
       {state.text ? <div className={`push-message ${state.type}`}>{state.text}</div> : null}

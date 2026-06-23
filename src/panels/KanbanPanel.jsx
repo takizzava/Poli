@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 
 const COLUMNS = [
-  { key: 'todo', title: 'Нужно сделать' },
-  { key: 'doing', title: 'В работе' },
-  { key: 'done', title: 'Готово' },
+  { key: 'todo', title: 'Нужно сделать', hint: 'Новые и отложенные задачи' },
+  { key: 'doing', title: 'В работе', hint: 'То, что уже в фокусе' },
+  { key: 'done', title: 'Готово', hint: 'Завершённые напоминания' },
 ]
 
 const ORDER = COLUMNS.map((column) => column.key)
@@ -66,7 +66,7 @@ export default function KanbanPanel({ items }) {
       <header className="kanban-top">
         <div>
           <h3>Канбан задач</h3>
-          <p>Перетаскивай карточки между колонками или меняй статус через селект.</p>
+          <p>Перетаскивайте карточки между колонками или меняйте статус вручную, если работаете с телефона.</p>
         </div>
         <div className="kanban-stats">
           <span>Всего: {tasks.length}</span>
@@ -82,25 +82,40 @@ export default function KanbanPanel({ items }) {
             onDragOver={(event) => event.preventDefault()}
             onDrop={() => onDrop(column.key)}
           >
-            <header>
-              <h4>{column.title}</h4>
-              <span>{byColumn[column.key]?.length || 0}</span>
+            <header className="kanban-col-head">
+              <div>
+                <h4>{column.title}</h4>
+                <p>{column.hint}</p>
+              </div>
+              <span className="kanban-count">{byColumn[column.key]?.length || 0}</span>
             </header>
 
             <div className="kanban-stack">
               {(byColumn[column.key] || []).map((task) => {
-                const isOverdue = new Date(task.due) < new Date()
+                const dueDate = new Date(task.due)
+                const isOverdue = dueDate < new Date()
+
                 return (
                   <article
                     key={task.id}
-                    className={`kanban-card ${dragId === task.id ? 'dragging' : ''}`}
+                    className={`kanban-card ${dragId === task.id ? 'dragging' : ''} ${isOverdue ? 'overdue' : ''}`}
                     draggable
                     onDragStart={() => setDragId(task.id)}
                     onDragEnd={() => setDragId(null)}
                   >
+                    <div className="kanban-card-top">
+                      <span className="kanban-card-id">#{String(task.id).slice(0, 8)}</span>
+                      {isOverdue ? <span className="task-badge">Просрочено</span> : <span className="task-badge task-badge--ok">По плану</span>}
+                    </div>
+
                     <p className="task-text">{task.text}</p>
-                    <small>{new Date(task.due).toLocaleString('ru-RU')}</small>
-                    {isOverdue && <span className="task-badge">ено</span>}
+
+                    <div className="kanban-meta">
+                      <div className="kanban-meta-item">
+                        <span className="kanban-meta-label">Срок</span>
+                        <strong>{dueDate.toLocaleString('ru-RU')}</strong>
+                      </div>
+                    </div>
 
                     <label className="status-field">
                       <span>Статус</span>
@@ -112,15 +127,19 @@ export default function KanbanPanel({ items }) {
                     </label>
 
                     <div className="kanban-actions">
-                      <button type="button" className="ghost" onClick={() => move(task.id, 'left')}>Назад</button>
-                      <button type="button" className="primary" onClick={() => move(task.id, 'right')}>Вперед</button>
+                      <button type="button" className="ghost" onClick={() => move(task.id, 'left')}>
+                        Назад
+                      </button>
+                      <button type="button" className="primary" onClick={() => move(task.id, 'right')}>
+                        Вперёд
+                      </button>
                     </div>
                   </article>
                 )
               })}
 
               {(!byColumn[column.key] || byColumn[column.key].length === 0) && (
-                <div className="kanban-empty">Пусто. Перетащи сюда задачу.</div>
+                <div className="kanban-empty">Пусто. Перетащите сюда задачу или дождитесь новой записи.</div>
               )}
             </div>
           </section>

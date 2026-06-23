@@ -86,7 +86,7 @@ export default function NotificationSettingsForm() {
       <div className="notif-card">
         <div className="notif-header">
           <div>
-            <span className="eyebrow">NOTIFICATION MATRIX</span>
+            <span className="eyebrow">Notification Matrix</span>
             <h4>Загружаем параметры</h4>
           </div>
         </div>
@@ -103,10 +103,10 @@ export default function NotificationSettingsForm() {
     <form className="notif-card" onSubmit={handleSave}>
       <div className="notif-header">
         <div>
-          <p className="eyebrow">NOTIFICATION MATRIX</p>
-          <h4>Каналы, режимы и тихие часы</h4>
+          <p className="eyebrow">Notification Matrix</p>
+          <h4>Каналы доставки и режимы тишины</h4>
           <p className="notif-desc">
-            Настройте доставку напоминаний, Do Not Disturb и интервалы тишины в одном блоке.
+            Настройте, куда отправлять напоминания и когда приложение должно временно молчать.
           </p>
         </div>
         <div className="notif-actions">
@@ -128,46 +128,71 @@ export default function NotificationSettingsForm() {
       {!error && success ? <div className="notif-alert success">{success}</div> : null}
 
       <div className="notif-grid">
-        <section className="notif-box">
-          <h5>Каналы доставки</h5>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={!!settings.push_enabled}
-              onChange={(event) => updateField('push_enabled', event.target.checked)}
-            />
-            <span>Push уведомления</span>
-          </label>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={!!settings.in_app_enabled}
-              onChange={(event) => updateField('in_app_enabled', event.target.checked)}
-            />
-            <span>Внутри приложения</span>
-          </label>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={!!settings.email_enabled}
-              onChange={(event) => updateField('email_enabled', event.target.checked)}
-            />
-            <span>Email</span>
-          </label>
+        <section className="notif-box notif-box--channels">
+          <div className="notif-box-copy">
+            <h5>Каналы доставки</h5>
+            <p>Включайте только те типы уведомлений, которые реально нужны пользователю.</p>
+          </div>
+
+          <div className="channel-list">
+            <label className="channel-card">
+              <input
+                type="checkbox"
+                checked={!!settings.push_enabled}
+                onChange={(event) => updateField('push_enabled', event.target.checked)}
+              />
+              <div>
+                <strong>Web Push</strong>
+                <span>Уведомления через браузер и Service Worker.</span>
+              </div>
+            </label>
+
+            <label className="channel-card">
+              <input
+                type="checkbox"
+                checked={!!settings.in_app_enabled}
+                onChange={(event) => updateField('in_app_enabled', event.target.checked)}
+              />
+              <div>
+                <strong>Внутри приложения</strong>
+                <span>Локальные уведомления прямо в интерфейсе.</span>
+              </div>
+            </label>
+
+            <label className="channel-card">
+              <input
+                type="checkbox"
+                checked={!!settings.email_enabled}
+                onChange={(event) => updateField('email_enabled', event.target.checked)}
+              />
+              <div>
+                <strong>Email</strong>
+                <span>Отдельный канал для уведомлений вне браузера.</span>
+              </div>
+            </label>
+          </div>
         </section>
 
-        <section className="notif-box">
-          <h5>Do Not Disturb</h5>
-          <label className="checkbox-row">
+        <section className="notif-box notif-box--dnd">
+          <div className="notif-box-copy">
+            <h5>Do Not Disturb</h5>
+            <p>Ограничивает доставку в указанное окно времени по выбранному часовому поясу.</p>
+          </div>
+
+          <label className="channel-card channel-card--compact">
             <input
               type="checkbox"
               checked={!!settings.do_not_disturb_enabled}
               onChange={(event) => updateField('do_not_disturb_enabled', event.target.checked)}
             />
-            <span>Включить режим тишины</span>
+            <div>
+              <strong>Включить режим тишины</strong>
+              <span>Блокировать уведомления в основном интервале DND.</span>
+            </div>
           </label>
+
           <div className="time-row">
-            <label>
+            <label className="select-field">
               <span className="field-label">С</span>
               <input
                 type="time"
@@ -176,7 +201,7 @@ export default function NotificationSettingsForm() {
                 disabled={!settings.do_not_disturb_enabled}
               />
             </label>
-            <label>
+            <label className="select-field">
               <span className="field-label">До</span>
               <input
                 type="time"
@@ -186,6 +211,7 @@ export default function NotificationSettingsForm() {
               />
             </label>
           </div>
+
           <label className="select-field">
             <span className="field-label">Часовой пояс</span>
             <select
@@ -202,11 +228,11 @@ export default function NotificationSettingsForm() {
         </section>
       </div>
 
-      <section className="notif-box">
+      <section className="notif-box notif-box--quiet">
         <div className="box-head">
           <div>
             <h5>Тихие часы</h5>
-            <p>Локальные интервалы, когда уведомления не должны беспокоить пользователя.</p>
+            <p>Дополнительные интервалы, в которые приложение не должно беспокоить пользователя.</p>
           </div>
           <button type="button" className="btn secondary sm" onClick={addQuietRange}>
             Добавить интервал
@@ -214,24 +240,29 @@ export default function NotificationSettingsForm() {
         </div>
 
         {!quietHours.length ? (
-          <div className="muted">
-            Пока пусто. Добавьте интервал, если требуется отдельное окно тишины помимо DND.
+          <div className="muted quiet-empty">
+            Пока интервалов нет. Добавьте отдельное окно тишины, если базового DND недостаточно.
           </div>
         ) : (
           <div className="quiet-list">
             {quietHours.map((slot, index) => (
               <div className="quiet-row" key={`${slot.start}-${slot.end}-${index}`}>
-                <input
-                  type="time"
-                  value={slot.start || ''}
-                  onChange={(event) => updateQuietRange(index, 'start', event.target.value)}
-                />
-                <span className="quiet-sep">→</span>
-                <input
-                  type="time"
-                  value={slot.end || ''}
-                  onChange={(event) => updateQuietRange(index, 'end', event.target.value)}
-                />
+                <label className="select-field">
+                  <span className="field-label">Начало</span>
+                  <input
+                    type="time"
+                    value={slot.start || ''}
+                    onChange={(event) => updateQuietRange(index, 'start', event.target.value)}
+                  />
+                </label>
+                <label className="select-field">
+                  <span className="field-label">Конец</span>
+                  <input
+                    type="time"
+                    value={slot.end || ''}
+                    onChange={(event) => updateQuietRange(index, 'end', event.target.value)}
+                  />
+                </label>
                 <button type="button" className="btn ghost sm" onClick={() => removeQuietRange(index)}>
                   Удалить
                 </button>
